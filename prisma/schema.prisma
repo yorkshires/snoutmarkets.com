@@ -1,0 +1,37 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+model User { id String @id @default(cuid()) email String @unique name String? role Role @default(USER) createdAt DateTime @default(now()) seller SellerProfile? listings Listing[] }
+model SellerProfile { id String @id @default(cuid()) user User @relation(fields:[userId], references:[id]) userId String @unique displayName String phone String? location String? bio String? createdAt DateTime @default(now()) }
+model Category { id String @id @default(cuid()) slug String @unique name String listings Listing[] }
+model Listing {
+  id String @id @default(cuid())
+  title String
+  description String
+  priceCents Int
+  currency String @default("DKK")
+  location String?
+  imageUrl String?
+  status ListingStatus @default(ACTIVE)
+  user User @relation(fields:[userId], references:[id])
+  userId String
+  category Category? @relation(fields:[categoryId], references:[id])
+  categoryId String?
+  isAnimal Boolean @default(false)
+  breed String?
+  ageMonths Int?
+  sex Sex?
+  vaccinated Boolean?
+  microchipped Boolean?
+  pedigree Boolean?
+  color String?
+  size String?
+  createdAt DateTime @default(now())
+  inquiries Inquiry[]
+  @@index([status])
+  @@index([title])
+}
+model Inquiry { id String @id @default(cuid()) listing Listing @relation(fields:[listingId], references:[id]) listingId String buyerName String buyerEmail String message String ip String? userAgent String? createdAt DateTime @default(now()) }
+model MagicLink { id String @id @default(cuid()) email String token String @unique expiresAt DateTime usedAt DateTime? createdAt DateTime @default(now()) @@index([email]) }
+enum ListingStatus { ACTIVE INACTIVE }
+enum Role { USER ADMIN }
+enum Sex { MALE FEMALE }
