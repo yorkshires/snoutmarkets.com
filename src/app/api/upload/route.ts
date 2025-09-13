@@ -12,28 +12,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing file" }, { status: 400 });
     }
 
-    // Gem i en mappe pr. type – og gør offentlig tilgængelig
-    const blob = await put(`listings/${Date.now()}-${file.name}`, file, {
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!token) {
+      return NextResponse.json(
+        { error: "Missing BLOB_READ_WRITE_TOKEN" },
+        { status: 500 }
+      );
+    }
+
+    // simple guards (valgfrit)
+    if (!file.type.startsWith("image/")) {
+      return NextResponse.json({ error: "Only image files allowed" }, { status: 400 });
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: "Max 10MB" }, { status: 400 });
+    }
+
+    const safeName = file.name.replace(/[^\w.\-]/g, "_");
+
+    const blob = await put(`listings/${Date.now()}-${safeName}`, file, {
       access: "public",
-      addRandomSuffix: true,
-      contentType: file.type,
+      token,
     });
 
-    return NextResponse.json({
-      url: blob.url,
-      pathname: blob.pathname,
-      size: blob.size,
-      contentType: blob.contentType,
-    });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    // nogle versioner har ikke blob.pathname i typen – afled den sikkert fra URL:
+    const pathname =
+      (blob as any).pathname ?? new URL(blob.url).pathname;
+
+    return NextResponse.json(
+      {
+        url: blob.url,
+        pathname,
+        // tag metadata fra File – ikke fra blob-typen:
+        size: file.size,
+        contentType: file.type,
+      },
+      { status: 200 }
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err?.message || "Upload failed" },
+      { status: 500 }
+    );
   }
-}
-
-export async function GET() {
-  return new Response("Method not allowed", {
-    status: 405,
-    headers: { Allow: "POST" },
-  });
 }
