@@ -1,61 +1,39 @@
 // src/app/api/auth/callback/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createSession } from "@/lib/auth";
 
-function baseUrl() {
-  if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "http://localhost:3000";
-}
-
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const token = url.searchParams.get("token");
-
+export async function GET(req: NextRequest) {
+  const token = req.nextUrl.searchParams.get("token") ?? "";
   if (!token) {
-    return NextResponse.json({ error: "Missing token" }, { status: 400 });
+    return NextResponse.redirect(new URL("/login?error=token", req.url));
   }
 
-  // Find gyldigt, ubrugt link
-  const record = await prisma.magicLink.findFirst({
-    where: {
-      token,
-      usedAt: null,
-      expiresAt: { gt: new Date() },
-    },
-    select: { id: true, email: true },
-  });
-
-  if (!record) {
-    return NextResponse.redirect(`${baseUrl()}/login?error=invalid_or_expired`);
+  // find link (token skal være unik eller brug findFirst)
+  const link = await prisma.magicLink.findUnique({ where: { token } });
+  if (!link || link.usedAt || link.expiresAt < new Date()) {
+    return NextResponse.redirect(new URL("/login?error=expired", req.url));
   }
 
-  // Find/opret bruger ud fra e-mail
-  let user = await prisma.user.findUnique({
-    where: { email: record.email },
-    select: { id: true },
-  });
-
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email: record.email,
-        name: record.email.split("@")[0] ?? "User",
-      },
-      select: { id: true },
-    });
-  }
-
-  // Markér magic link som brugt
+  // markér som brugt
   await prisma.magicLink.update({
-    where: { id: record.id },
+    where: { token },
     data: { usedAt: new Date() },
   });
 
-  // Opret session for brugerens id
+  // opret/åbn bruger på email
+  const user = await prisma.user.upsert({
+    where: { email: link.email },
+    update: {},
+    create: { email: link.email },
+  });
+
+  // ⬅︎ VIGTIGT: createSession forventer en string (user.id)
   await createSession(user.id);
 
-  // Send videre – tilpas gerne til /sell/new hvis du vil
-  return NextResponse.redirect(`${baseUrl()}/account`);
+  // tilbage til konto (ret evt. stien)
+  return NextResponse.redirect(new URL("/account", req.url));
 }
+
+// (valgfrit) kør i node-runtime
+export const runtime = "nodejs";
