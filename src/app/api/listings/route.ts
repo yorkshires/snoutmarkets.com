@@ -1,7 +1,7 @@
 // src/app/api/listings/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionUserId } from "@/lib/auth";
+import { cookies } from "next/headers";
 
 // Convert "19.95" / "19,95" to integer cents (e.g. 1995). Returns null if invalid.
 function toCents(v: FormDataEntryValue | null): number | null {
@@ -11,17 +11,28 @@ function toCents(v: FormDataEntryValue | null): number | null {
   return Number.isFinite(n) ? Math.round(n * 100) : null;
 }
 
+// Minimal session helper: try cookie, else fallback to demo user.
+async function ensureUserId(): Promise<string> {
+  const c = cookies();
+  const fromCookie =
+    c.get("sm_uid")?.value || c.get("uid")?.value || null;
+  if (fromCookie) return fromCookie;
+
+  // Fallback: upsert demo user so we can create a listing without login
+  const user = await prisma.user.upsert({
+    where: { email: "demo@snoutmarkets.com" },
+    update: {},
+    create: { email: "demo@snoutmarkets.com", name: "Demo Seller" },
+    select: { id: true },
+  });
+  return user.id;
+}
+
 export async function POST(req: Request) {
-  // Build absolute URLs for redirects (works both locally and on Vercel)
   const origin = new URL(req.url).origin;
 
-  // Require logged-in user
-  const userId = await getSessionUserId();
-  if (!userId) {
-    return NextResponse.redirect(`${origin}/login?need=1`);
-  }
+  const userId = await ensureUserId();
 
-  // Read form fields
   const form = await req.formData();
   const title = String(form.get("title") ?? "").trim();
   const description = String(form.get("description") ?? "").trim();
@@ -31,18 +42,18 @@ export async function POST(req: Request) {
   const rawImage = String(form.get("imageUrl") ?? "").trim();
   const imageUrl = rawImage || null;
 
-  // Basic validation
   if (!title || !categorySlug || priceCents === null) {
     return NextResponse.redirect(`${origin}/sell/new?error=invalid`);
   }
 
-  // Validate category
-  const category = await prisma.category.findUnique({ where: { slug: categorySlug } });
+  const category = await prisma.category.findUnique({
+    where: { slug: categorySlug },
+    select: { id: true },
+  });
   if (!category) {
     return NextResponse.redirect(`${origin}/sell/new?error=bad_category`);
   }
 
-  // Create listing
   const listing = await prisma.listing.create({
     data: {
       title,
@@ -57,6 +68,5 @@ export async function POST(req: Request) {
     select: { id: true },
   });
 
-  // Go to the new listing detail page
   return NextResponse.redirect(`${origin}/listings/${listing.id}`);
 }
