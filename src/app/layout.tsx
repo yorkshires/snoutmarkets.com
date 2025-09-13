@@ -14,9 +14,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="border-b bg-white">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
             <Link href="/" className="text-xl font-semibold">SnoutMarkets</Link>
+
+            {/* right side actions */}
             <div className="flex items-center gap-3">
               <Link href="/sell/new" className="rounded-xl border px-4 py-2">
                 Sell
+              </Link>
+              <Link href="/account/listings" className="rounded-xl border px-4 py-2">
+                My listings
               </Link>
               <Link href="/login" className="rounded-xl bg-orange-600 text-white px-4 py-2">
                 Log in
