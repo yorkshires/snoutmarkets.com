@@ -1,23 +1,23 @@
 // src/app/api/auth/callback/route.ts
-export const runtime = "nodejs";
-
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createSession } from "@/lib/auth";
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const token = searchParams.get("token") ?? "";
+function baseUrl() {
+  if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
+}
 
-  const base =
-    process.env.APP_BASE_URL ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    `http://${req.headers.get("host") ?? "localhost:3000"}`;
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const token = url.searchParams.get("token");
 
   if (!token) {
-    return NextResponse.redirect(`${base}/login?error=token`);
+    return NextResponse.json({ error: "Missing token" }, { status: 400 });
   }
 
+  // Find gyldigt, ubrugt link
   const record = await prisma.magicLink.findFirst({
     where: {
       token,
@@ -28,18 +28,34 @@ export async function GET(req: Request) {
   });
 
   if (!record) {
-    return NextResponse.redirect(`${base}/login?error=invalid`);
+    return NextResponse.redirect(`${baseUrl()}/login?error=invalid_or_expired`);
   }
 
-  // markér brugt
+  // Find/opret bruger ud fra e-mail
+  let user = await prisma.user.findUnique({
+    where: { email: record.email },
+    select: { id: true },
+  });
+
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        email: record.email,
+        name: record.email.split("@")[0] ?? "User",
+      },
+      select: { id: true },
+    });
+  }
+
+  // Markér magic link som brugt
   await prisma.magicLink.update({
     where: { id: record.id },
     data: { usedAt: new Date() },
   });
 
-  // opret session-cookie
-  await createSession(record.userId);
+  // Opret session for brugerens id
+  await createSession(user.id);
 
-  // send videre (ændr evt. til /sell/new)
-  return NextResponse.redirect(`${base}/account`);
+  // Send videre – tilpas gerne til /sell/new hvis du vil
+  return NextResponse.redirect(`${baseUrl()}/account`);
 }
