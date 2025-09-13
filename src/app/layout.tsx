@@ -1,1 +1,32 @@
-import './globals.css'; import type { Metadata } from 'next'; import Link from 'next/link'; import { readSession } from '@/lib/auth'; export const metadata: Metadata={ title:'SnoutMarkets – Hundemarkedsplads (kontakt)', description:'Professionel markedsplads for hunde og hundeudstyr – uden betaling, kontakt sælger direkte.', openGraph:{title:'SnoutMarkets', description:'Moderne kontakt-markedsplads for hunde.', type:'website'}}; export default async function RootLayout({ children }:{ children:React.ReactNode }){ const session=await readSession(); return (<html lang='da'><body><header className='bg-white border-b'><div className='container py-4 flex items-center justify-between'><Link href='/' className='flex items-center gap-2'><div className='h-8 w-8 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold'>🐾</div><span className='text-xl font-semibold'>SnoutMarkets</span></Link><nav className='flex items-center gap-2'>{!session?.email && <Link href='/login' className='btn'>Log ind</Link>}{session?.email && <Link href='/dashboard' className='btn btn-primary'>Dashboard</Link>}</nav></div></header><main className='container py-8'>{children}</main><footer className='mt-16 border-t'><div className='container py-10 text-sm text-gray-600 flex items-center justify-between'><p>© {new Date().getFullYear()} SnoutMarkets</p><div className='flex gap-4'><Link href='/legal/privacy' className='link'>Privatliv</Link><Link href='/legal/terms' className='link'>Vilkår</Link></div></div></footer></body></html>); }
+// src/app/layout.tsx
+import "./globals.css";
+import Link from "next/link";
+
+export const metadata = {
+  title: "SnoutMarkets",
+  description: "Buy & sell dogs and gear",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body className="min-h-screen bg-orange-50">
+        <header className="border-b bg-white">
+          <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <Link href="/" className="text-xl font-semibold">SnoutMarkets</Link>
+            <Link href="/login" className="rounded-xl border px-4 py-2">Log in</Link>
+          </div>
+        </header>
+
+        <main>{children}</main>
+
+        <footer className="border-t bg-white">
+          <div className="max-w-6xl mx-auto px-4 py-6 flex items-center justify-end gap-6 text-sm text-gray-600">
+            <Link href="/privacy">Privacy</Link>
+            <Link href="/terms">Terms</Link>
+          </div>
+        </footer>
+      </body>
+    </html>
+  );
+}
