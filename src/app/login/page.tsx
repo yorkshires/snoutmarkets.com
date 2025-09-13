@@ -1,31 +1,56 @@
-// src/app/login/page.tsx
-export default function LoginPage() {
-  return (
-    <main className="max-w-md mx-auto px-4 py-10">
-      <h1 className="text-2xl font-semibold mb-4">Log in</h1>
-      <p className="text-gray-600 mb-6">
-        We’ll email you a one-time login link.
-      </p>
+'use client';
 
-      <form
-        action="/api/auth/magic-link"
-        method="post"
-        className="rounded-xl border p-4 space-y-3"
-      >
-        <label className="block text-sm font-medium">Email</label>
-        <input
-          className="w-full rounded-md border px-3 py-2"
-          name="email"
-          type="email"
-          required
-        />
-        <button
-          type="submit"
-          className="rounded-xl bg-orange-600 text-white px-4 py-2"
-        >
-          Send login link
+import { useState } from 'react';
+
+export default function LoginPage() {
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [message, setMessage] = useState<string>("");
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setStatus('sending');
+    setMessage("");
+
+    const res = await fetch('/api/auth/magic-link', {
+      method: 'POST',
+      body: new FormData(e.currentTarget),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      setStatus('error');
+      setMessage('Could not send login link.');
+      return;
+    }
+
+    // Hvis der ikke er sat mail op, følger vi linket automatisk
+    if (data.sent === false && data.link) {
+      window.location.href = data.link;
+      return;
+    }
+
+    setStatus('sent');
+    setMessage('Check your inbox for the login link.');
+  }
+
+  return (
+    <div className="max-w-md mx-auto space-y-4">
+      <h1 className="text-2xl font-semibold">Log in</h1>
+      <p className="text-gray-600">We’ll send you a one-time link to your email.</p>
+
+      <form onSubmit={onSubmit} className="card space-y-3">
+        <div>
+          <label className="label">Email</label>
+          <input className="input" name="email" type="email" required />
+        </div>
+
+        <button className="btn btn-primary" type="submit" disabled={status === 'sending'}>
+          {status === 'sending' ? 'Sending…' : 'Send login link'}
         </button>
+
+        {message && <div className="text-sm text-gray-700">{message}</div>}
       </form>
-    </main>
+    </div>
   );
 }
