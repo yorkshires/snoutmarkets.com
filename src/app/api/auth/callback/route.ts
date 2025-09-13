@@ -24,7 +24,7 @@ export async function GET(req: Request) {
       usedAt: null,
       expiresAt: { gt: new Date() },
     },
-    select: { id: true, userId: true },
+    select: { id: true, email: true },
   });
 
   if (!record) {
