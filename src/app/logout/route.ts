@@ -1,8 +1,16 @@
-// src/app/logout/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { clearSession } from "@/lib/auth";
 
-export async function POST() {
+async function doLogout(req: NextRequest) {
   clearSession();
-  return NextResponse.json({ ok: true });
+  // send brugeren tilbage til forsiden
+  return NextResponse.redirect(new URL("/", req.url));
+}
+
+export async function GET(req: NextRequest) {
+  return doLogout(req);
+}
+
+export async function POST(req: NextRequest) {
+  return doLogout(req);
 }
