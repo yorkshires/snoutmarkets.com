@@ -25,7 +25,7 @@ export default async function RootLayout({
       <body className="min-h-screen bg-orange-50">
         <header className="border-b bg-white/95 backdrop-blur">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            {/* Logo + brand (uses /publiclogo.png) */}
+            {/* Logo + brand (file at /public/publiclogo.png -> URL /publiclogo.png) */}
             <a href="/" className="flex items-center gap-2" aria-label="SnoutMarkets">
               <img
                 src="/publiclogo.png"
