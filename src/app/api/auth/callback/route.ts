@@ -5,29 +5,26 @@ import { createSession } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
-  if (!token) return NextResponse.redirect(new URL("/login?error=token", req.url));
+  if (!token) {
+    return NextResponse.redirect(new URL("/login?error=invalid", req.url));
+  }
 
-  const link = await prisma.magicLink.findUnique({ where: { token } });
-  if (!link || link.usedAt || link.expiresAt < new Date()) {
+  const record = await prisma.magicLink.findUnique({ where: { token } });
+  if (!record || record.usedAt || record.expiresAt < new Date()) {
     return NextResponse.redirect(new URL("/login?error=expired", req.url));
   }
 
-  // markér som brugt
   await prisma.magicLink.update({
     where: { token },
     data: { usedAt: new Date() },
   });
 
-  // opret/find bruger
   const user = await prisma.user.upsert({
-    where: { email: link.email },
+    where: { email: record.email },
     update: {},
-    create: { email: link.email },
+    create: { email: record.email },
   });
 
-  // sæt både JWT og sm_uid cookies
   await createSession(user.id);
-
-  // tydelig destination efter login
   return NextResponse.redirect(new URL("/account/listings", req.url));
 }
