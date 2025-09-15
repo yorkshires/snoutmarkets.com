@@ -16,14 +16,17 @@ function formatPrice(priceCents?: number | null, currency?: string | null) {
 
 export default async function ListingPage({ params }: { params: { id: string } }) {
   const listing = await prisma.listing.findUnique({
-    where: { id: params.id }, // if numeric, cast: where: { id: Number(params.id) }
+    where: { id: params.id }, // if your ID is numeric: where: { id: Number(params.id) }
     include: {
       user: true,
-      category: true, // <-- include the relation so we can read category.name
+      category: true, // need this for category.name
     },
   });
 
   if (!listing) return notFound();
+
+  const categoryName = (listing.category?.name || "").trim();
+  const metaLine = [categoryName, listing.location || ""].filter(Boolean).join(" • ");
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 grid md:grid-cols-3 gap-6">
@@ -41,10 +44,10 @@ export default async function ListingPage({ params }: { params: { id: string } }
           <div className="text-lg font-medium text-slate-900 mb-4">
             {formatPrice(listing.priceCents, listing.currency)}
           </div>
-          <div className="text-sm text-slate-600 mb-3">
-            {(listing.category?.name || "").trim()} {listing.location ? " • " + listing.location : ""}
-          </div>
-          <p className="text-slate-800 whitespace-pre-line">{listing.description}</p>
+          {metaLine ? (
+            <div className="text-sm text-slate-600 mb-3">{metaLine}</div>
+          ) : null}
+          <p className="text-slate-800 whitespace-pre-line">{listing.description || ""}</p>
         </div>
       </div>
 
