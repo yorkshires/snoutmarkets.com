@@ -1,3 +1,15 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = { images: { remotePatterns: [{ protocol: 'https', hostname: 'images.unsplash.com' },{ protocol: 'https', hostname: 'cdn.pixabay.com' },{ protocol: 'https', hostname: 'picsum.photos' }] } };
+const nextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "https://www.snoutmarkets.com/:path*",
+        has: [],
+        destination: "https://snoutmarkets.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
+};
+
 export default nextConfig;
