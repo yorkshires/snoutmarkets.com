@@ -1,11 +1,15 @@
 // src/components/ListingCard.tsx
 import Link from "next/link";
 
-function formatPrice(v: any) {
-  if (v == null) return "";
-  const n = typeof v === "number" ? v : parseFloat(v);
-  if (Number.isNaN(n)) return "";
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR" }).format(n);
+function formatPrice(priceCents?: number | null, currency?: string | null) {
+  if (priceCents == null) return "";
+  const value = Math.round(priceCents) / 100;
+  const cur = (currency || "EUR").toUpperCase();
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(value);
+  } catch {
+    return `${value.toFixed(2)} ${cur}`;
+  }
 }
 
 export default function ListingCard({ listing }: { listing: any }) {
@@ -31,7 +35,7 @@ export default function ListingCard({ listing }: { listing: any }) {
             {listing.title}
           </h3>
           <div className="text-slate-900 font-medium shrink-0">
-            {formatPrice(listing.price)}
+            {formatPrice(listing.priceCents, listing.currency)}
           </div>
         </div>
         <p className="text-sm text-slate-600 mt-1">
