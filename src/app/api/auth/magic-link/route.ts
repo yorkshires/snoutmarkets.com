@@ -1,60 +1,41 @@
 // src/app/api/auth/magic-link/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import crypto from "crypto";
-import { Resend } from "resend";
 
-function baseUrl() {
-  if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "http://localhost:3000";
+function getBaseUrl(req: NextRequest) {
+  // Brug altid produktionsdomænet hvis det er sat
+  const envUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.BASE_URL;
+  if (envUrl) return envUrl;
+  // Fallbacks (ok i udvikling / hvis preview er offentligt)
+  const vercelUrl = process.env.VERCEL_URL; // fx myapp-abc123.vercel.app
+  if (vercelUrl) return `https://${vercelUrl}`;
+  return req.nextUrl.origin;
 }
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+export async function POST(req: NextRequest) {
+  const form = await req.formData();
+  const email = String(form.get("email") || "").trim().toLowerCase();
+  if (!email) return NextResponse.json({ ok: false }, { status: 400 });
 
-export async function POST(req: Request) {
-  try {
-    const form = await req.formData();
-    const raw = String(form.get("email") ?? "").trim().toLowerCase();
+  // find/creer bruger
+  const user = await prisma.user.upsert({
+    where: { email },
+    update: {},
+    create: { email },
+    select: { id: true, email: true },
+  });
 
-    if (!raw || !/^\S+@\S+\.\S+$/.test(raw)) {
-      return NextResponse.json({ error: "Invalid email" }, { status: 400 });
-    }
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    // Sørg for at brugeren eksisterer (valgfrit men praktisk)
-    await prisma.user.upsert({
-      where: { email: raw },
-      update: {},
-      create: { email: raw, name: raw.split("@")[0] ?? "User" },
-    });
+  await prisma.magicLink.create({
+    data: { token, email: user.email, expiresAt },
+  });
 
-    const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+  const base = getBaseUrl(req);
+  const link = `${base}/api/auth/callback?token=${token}`;
 
-    // Gem magic-link med EMAIL (ikke userId)
-    await prisma.magicLink.create({
-      data: {
-        token,
-        email: raw,
-        expiresAt,
-      },
-    });
-
-    const loginLink = `${baseUrl()}/api/auth/callback?token=${token}`;
-
-    // Send mail via Resend hvis tilgængelig – ellers returnér link i JSON (praktisk i dev)
-    if (resend) {
-      await resend.emails.send({
-        from: process.env.AUTH_EMAIL_FROM || "SnoutMarkets <login@snoutmarkets.com>",
-        to: raw,
-        subject: "Your login link",
-        text: `Click to log in: ${loginLink}\n\nThis link expires in 15 minutes.`,
-      });
-    }
-
-    return NextResponse.json({ ok: true, sent: Boolean(resend), link: resend ? undefined : loginLink });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
-  }
+  // Hvis du ikke har mail sat op endnu, returnér linket som nu:
+  return NextResponse.json({ ok: true, sent: false, link });
 }
