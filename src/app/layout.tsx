@@ -2,9 +2,7 @@
 import "./globals.css";
 import Link from "next/link";
 import { getSessionUserId } from "@/lib/auth";
-import AuthButtons from "@/components/AuthButtons";
 
-// ensure no stale caching for the header
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "default-no-store";
@@ -19,32 +17,49 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Server-side read (fast, correct on first load)
   const userId = await getSessionUserId();
   const loggedIn = Boolean(userId);
 
   return (
     <html lang="en">
       <body className="min-h-screen bg-orange-50">
-        <header className="border-b bg-white">
+        <header className="border-b bg-white/95 backdrop-blur">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            {/* use a normal anchor to force a full document load if needed */}
-            <a href="/" aria-label="SnoutMarkets" className="text-xl font-semibold">
-              SnoutMarkets
+            {/* Logo + brand (uses /publiclogo.png) */}
+            <a href="/" className="flex items-center gap-2" aria-label="SnoutMarkets">
+              <img
+                src="/publiclogo.png"
+                alt="SnoutMarkets logo"
+                className="h-8 w-8 rounded-xl"
+                loading="eager"
+              />
+              <span className="text-2xl md:text-3xl font-semibold tracking-tight">
+                SnoutMarkets
+              </span>
             </a>
 
-            <div className="flex items-center gap-3">
+            <nav className="flex items-center gap-3">
               <Link href="/sell/new" className="rounded-xl border px-4 py-2">
                 Sell
               </Link>
-
               <Link href="/account/listings" className="rounded-xl border px-4 py-2">
                 My listings
               </Link>
-
-              {/* Client component confirms cookie after hydration */}
-              <AuthButtons initialLoggedIn={loggedIn} />
-            </div>
+              {loggedIn ? (
+                <form action="/logout" method="post">
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-orange-600 text-white px-4 py-2"
+                  >
+                    Log out
+                  </button>
+                </form>
+              ) : (
+                <Link href="/login" className="rounded-xl bg-orange-600 text-white px-4 py-2">
+                  Log in
+                </Link>
+              )}
+            </nav>
           </div>
         </header>
 
