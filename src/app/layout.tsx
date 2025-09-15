@@ -1,23 +1,22 @@
 // src/app/layout.tsx
 import "./globals.css";
 import Link from "next/link";
-import { cookies } from "next/headers";
+import { getSessionUserId } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "SnoutMarkets",
   description: "Buy & sell dogs and gear",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // Tjek om der findes en session-cookie
-  const jar = cookies();
-  // Tilpas evt. disse navne, hvis din cookie hedder noget andet
-  const rawSession =
-    jar.get("session")?.value ||
-    jar.get("sm_session")?.value ||
-    jar.get("snout_session")?.value;
-
-  const loggedIn = Boolean(rawSession);
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const userId = await getSessionUserId();
+  const loggedIn = Boolean(userId);
 
   return (
     <html lang="en">
