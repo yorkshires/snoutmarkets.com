@@ -2,45 +2,22 @@
 import "./globals.css";
 import Link from "next/link";
 import { cookies } from "next/headers";
-// Hvis du har en helper i lib/auth kan vi forsøge at bruge den.
-// Den er valgfri – fallback nedenfor kigger direkte i cookies.
-import { getSession } from "@/lib/auth";
 
 export const metadata = {
   title: "SnoutMarkets",
   description: "Buy & sell dogs and gear",
 };
 
-export default async function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  // Find ud af om brugeren er logget ind
-  let userEmail: string | null = null;
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Tjek om der findes en session-cookie
+  const jar = cookies();
+  // Tilpas evt. disse navne, hvis din cookie hedder noget andet
+  const rawSession =
+    jar.get("session")?.value ||
+    jar.get("sm_session")?.value ||
+    jar.get("snout_session")?.value;
 
-  // Prøv først via lib/auth (hvis funktionen findes)
-  try {
-    const s: any = await (getSession?.() ?? Promise.resolve(null));
-    if (s && (s.email || s.user?.email)) {
-      userEmail = s.email || s.user?.email;
-    }
-  } catch {
-    /* ignore */
-  }
-
-  // Fallback: kig direkte i cookies efter en session-cookie
-  if (!userEmail) {
-    const jar = cookies();
-    // Tilpas navnet hvis din cookie hedder noget andet
-    const raw =
-      jar.get("session")?.value ||
-      jar.get("sm_session")?.value ||
-      jar.get("snout_session")?.value;
-    if (raw) userEmail = "user";
-  }
-
-  const loggedIn = Boolean(userEmail);
+  const loggedIn = Boolean(rawSession);
 
   return (
     <html lang="en">
@@ -64,7 +41,6 @@ export default async function RootLayout({
               </Link>
 
               {loggedIn ? (
-                // POST til /logout (forudsætter app/logout/route.ts)
                 <form action="/logout" method="post">
                   <button
                     type="submit"
