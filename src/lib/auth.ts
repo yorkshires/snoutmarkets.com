@@ -2,20 +2,21 @@
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 
-export const SESSION_COOKIE = "sm.session";
+const JWT_COOKIES = ["sm.session", "session"]; // sæt begge for kompatibilitet
+const UID_COOKIE = "sm_uid";
 
 const secret = new TextEncoder().encode(
   process.env.JWT_SECRET || "dev-secret-change-me"
 );
 
-// fælles cookie-options
-function baseCookie() {
+function baseCookieOptions() {
   const secure = process.env.NODE_ENV === "production";
   const opts: Record<string, any> = {
+    path: "/",
     httpOnly: true,
     secure,
     sameSite: "lax" as const,
-    path: "/",
+    maxAge: 60 * 60 * 24 * 30, // 30 dage
   };
   const domain = process.env.COOKIE_DOMAIN?.trim();
   if (domain) opts.domain = domain; // fx snoutmarkets-com.vercel.app
@@ -31,33 +32,38 @@ export async function createSession(userId: string) {
 
   const jar = cookies();
 
-  // HttpOnly JWT til serverside beskyttede ruter
-  jar.set(SESSION_COOKIE, token, { ...baseCookie(), maxAge: 60 * 60 * 24 * 30 });
+  // HttpOnly JWT (begge navne for at matche forskellige checks i koden)
+  for (const name of JWT_COOKIES) {
+    jar.set(name, token, baseCookieOptions());
+  }
 
-  // Ikke-HttpOnly uid (din app læser denne nogle steder i UI/API)
-  jar.set("sm_uid", userId, {
-    ...baseCookie(),
-    httpOnly: false,
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  // Ikke-HttpOnly UID (UI og API’er læser denne flere steder)
+  const uidOpts = { ...baseCookieOptions(), httpOnly: false };
+  jar.set(UID_COOKIE, userId, uidOpts);
 }
 
 export async function getSessionUserId(): Promise<string | null> {
   const jar = cookies();
-  const raw = jar.get(SESSION_COOKIE)?.value;
-  if (!raw) return jar.get("sm_uid")?.value ?? null;
 
-  try {
-    const { payload } = await jwtVerify(raw, secret, { algorithms: ["HS256"] });
-    const sub = payload.sub;
-    return typeof sub === "string" && sub.length > 0 ? sub : null;
-  } catch {
-    return null;
+  // prøv JWT-cookies
+  for (const name of JWT_COOKIES) {
+    const raw = jar.get(name)?.value;
+    if (!raw) continue;
+    try {
+      const { payload } = await jwtVerify(raw, secret, { algorithms: ["HS256"] });
+      if (typeof payload.sub === "string" && payload.sub) return payload.sub;
+    } catch {
+      // prøv næste
+    }
   }
+
+  // fallback til sm_uid hvis sat
+  return jar.get(UID_COOKIE)?.value ?? null;
 }
 
 export function clearSession() {
   const jar = cookies();
-  jar.set(SESSION_COOKIE, "", { ...baseCookie(), maxAge: 0 });
-  jar.set("sm_uid", "", { ...baseCookie(), httpOnly: false, maxAge: 0 });
+  const opts = { ...baseCookieOptions(), maxAge: 0 };
+  for (const name of JWT_COOKIES) jar.set(name, "", opts);
+  jar.set(UID_COOKIE, "", { ...opts, httpOnly: false });
 }
