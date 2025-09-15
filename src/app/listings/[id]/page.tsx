@@ -16,8 +16,11 @@ function formatPrice(priceCents?: number | null, currency?: string | null) {
 
 export default async function ListingPage({ params }: { params: { id: string } }) {
   const listing = await prisma.listing.findUnique({
-    where: { id: params.id }, // if numeric id, cast: where: { id: Number(params.id) }
-    include: { user: true },
+    where: { id: params.id }, // if numeric, cast: where: { id: Number(params.id) }
+    include: {
+      user: true,
+      category: true, // <-- include the relation so we can read category.name
+    },
   });
 
   if (!listing) return notFound();
@@ -39,7 +42,7 @@ export default async function ListingPage({ params }: { params: { id: string } }
             {formatPrice(listing.priceCents, listing.currency)}
           </div>
           <div className="text-sm text-slate-600 mb-3">
-            {listing.category} • {listing.location}
+            {(listing.category?.name || "").trim()} {listing.location ? " • " + listing.location : ""}
           </div>
           <p className="text-slate-800 whitespace-pre-line">{listing.description}</p>
         </div>
