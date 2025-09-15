@@ -2,8 +2,12 @@
 import "./globals.css";
 import Link from "next/link";
 import { getSessionUserId } from "@/lib/auth";
+import AuthButtons from "@/components/AuthButtons";
 
+// ensure no stale caching for the header
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "default-no-store";
 
 export const metadata = {
   title: "SnoutMarkets",
@@ -15,7 +19,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Server-side check so the header reflects the real cookie/session
+  // Server-side read (fast, correct on first load)
   const userId = await getSessionUserId();
   const loggedIn = Boolean(userId);
 
@@ -24,7 +28,7 @@ export default async function RootLayout({
       <body className="min-h-screen bg-orange-50">
         <header className="border-b bg-white">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            {/* Use a normal anchor to force a full page reload */}
+            {/* use a normal anchor to force a full document load if needed */}
             <a href="/" aria-label="SnoutMarkets" className="text-xl font-semibold">
               SnoutMarkets
             </a>
@@ -34,30 +38,12 @@ export default async function RootLayout({
                 Sell
               </Link>
 
-              <Link
-                href="/account/listings"
-                className="rounded-xl border px-4 py-2"
-              >
+              <Link href="/account/listings" className="rounded-xl border px-4 py-2">
                 My listings
               </Link>
 
-              {loggedIn ? (
-                <form action="/logout" method="post">
-                  <button
-                    type="submit"
-                    className="rounded-xl bg-orange-600 text-white px-4 py-2"
-                  >
-                    Log out
-                  </button>
-                </form>
-              ) : (
-                <Link
-                  href="/login"
-                  className="rounded-xl bg-orange-600 text-white px-4 py-2"
-                >
-                  Log in
-                </Link>
-              )}
+              {/* Client component confirms cookie after hydration */}
+              <AuthButtons initialLoggedIn={loggedIn} />
             </div>
           </div>
         </header>
