@@ -1,15 +1,11 @@
-// src/app/api/auth/callback/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createSession } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const token = req.nextUrl.searchParams.get("token") ?? "";
-  if (!token) {
-    return NextResponse.redirect(new URL("/login?error=token", req.url));
-  }
+  const token = req.nextUrl.searchParams.get("token");
+  if (!token) return NextResponse.redirect(new URL("/login?error=token", req.url));
 
-  // find link (token skal være unik eller brug findFirst)
   const link = await prisma.magicLink.findUnique({ where: { token } });
   if (!link || link.usedAt || link.expiresAt < new Date()) {
     return NextResponse.redirect(new URL("/login?error=expired", req.url));
@@ -21,19 +17,16 @@ export async function GET(req: NextRequest) {
     data: { usedAt: new Date() },
   });
 
-  // opret/åbn bruger på email
+  // hent eller opret bruger
   const user = await prisma.user.upsert({
     where: { email: link.email },
     update: {},
-    create: { email: link.email },
+    create: { email: link.email, name: null },
   });
 
-  // ⬅︎ VIGTIGT: createSession forventer en string (user.id)
+  // opret session (forventet signatur: createSession(userId: string))
   await createSession(user.id);
 
-  // tilbage til konto (ret evt. stien)
+  // send videre
   return NextResponse.redirect(new URL("/account", req.url));
 }
-
-// (valgfrit) kør i node-runtime
-export const runtime = "nodejs";
