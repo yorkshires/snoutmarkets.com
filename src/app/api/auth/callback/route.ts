@@ -14,13 +14,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=expired", req.url));
   }
 
-  // markér link som brugt
+  // markér som brugt
   await prisma.magicLink.update({
     where: { token },
     data: { usedAt: new Date() },
   });
 
-  // opret/find bruger på email og start session
+  // opret/find bruger og lav session
   const user = await prisma.user.upsert({
     where: { email: link.email },
     update: {},
@@ -29,6 +29,6 @@ export async function GET(req: NextRequest) {
 
   await createSession(user.id);
 
-  // Redirect til en side der *findes*
-  return NextResponse.redirect(new URL("/", req.url));
+  // gå direkte til konto-oversigten, så man kan se man er logget ind
+  return NextResponse.redirect(new URL("/account/listings", req.url));
 }
