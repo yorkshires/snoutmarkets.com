@@ -15,6 +15,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Server-side check so the header reflects the real cookie/session
   const userId = await getSessionUserId();
   const loggedIn = Boolean(userId);
 
@@ -23,9 +24,10 @@ export default async function RootLayout({
       <body className="min-h-screen bg-orange-50">
         <header className="border-b bg-white">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            <Link href="/" className="text-xl font-semibold">
+            {/* Use a normal anchor to force a full page reload */}
+            <a href="/" aria-label="SnoutMarkets" className="text-xl font-semibold">
               SnoutMarkets
-            </Link>
+            </a>
 
             <div className="flex items-center gap-3">
               <Link href="/sell/new" className="rounded-xl border px-4 py-2">
