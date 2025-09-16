@@ -1,7 +1,6 @@
 // src/components/ListingCard.tsx
 import Link from "next/link";
 
-// Works with priceCents + currency and won't throw if currency is odd/empty
 function formatPrice(priceCents?: number | null, currency?: string | null) {
   if (priceCents == null) return "";
   const value = Math.round(priceCents) / 100;
@@ -13,31 +12,35 @@ function formatPrice(priceCents?: number | null, currency?: string | null) {
   }
 }
 
-export default function ListingCard({ listing }: { listing: any }) {
-  // Accept either relation, string, or categoryName
-  const categoryName =
-    (typeof listing?.category === "object" ? listing?.category?.name : listing?.category) ||
-    listing?.categoryName ||
-    "";
-
-  const meta = [categoryName, listing?.location || ""].filter(Boolean).join(" • ");
+export default function ListingCard({
+  listing,
+}: {
+  listing: {
+    id: string;
+    title?: string | null;
+    imageUrl?: string | null;
+    priceCents?: number | null;
+    currency?: string | null;
+    location?: string | null;
+    countryCode?: string | null;
+  };
+}) {
+  const meta = [listing.location, listing.countryCode].filter(Boolean).join(" • ");
 
   return (
     <Link
       href={`/listings/${listing.id}`}
-      className="group rounded-2xl border bg-white shadow-sm overflow-hidden hover:shadow-md transition"
+      className="group rounded-2xl overflow-hidden border bg-white shadow-sm hover:shadow-md transition"
     >
-      {listing?.imageUrl ? (
-        <img
-          src={listing.imageUrl}
-          alt={listing?.title || "Listing image"}
-          className="h-56 w-full object-cover"
-          loading="lazy"
-        />
-      ) : (
-        <div className="h-56 w-full bg-slate-100" />
-      )}
-
+      <div className="aspect-[4/3] bg-slate-100 overflow-hidden">
+        {listing.imageUrl ? (
+          <img
+            src={listing.imageUrl}
+            alt={listing.title || "Listing image"}
+            className="w-full h-full object-cover"
+          />
+        ) : null}
+      </div>
       <div className="p-4">
         <div className="flex items-center justify-between gap-3">
           <h3 className="font-semibold text-slate-900 group-hover:underline">
