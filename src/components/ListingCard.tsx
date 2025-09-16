@@ -1,14 +1,13 @@
 // src/components/ListingCard.tsx
 import Link from "next/link";
 
-function formatPrice(priceCents?: number | null, currency?: string | null) {
+function formatPriceEUR(priceCents?: number | null) {
   if (priceCents == null) return "";
   const value = Math.round(priceCents) / 100;
-  const cur = (currency || "EUR").toUpperCase();
   try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(value);
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR" }).format(value);
   } catch {
-    return `${value.toFixed(2)} ${cur}`;
+    return `${value.toFixed(2)} EUR`;
   }
 }
 
@@ -20,7 +19,7 @@ export default function ListingCard({
     title?: string | null;
     imageUrl?: string | null;
     priceCents?: number | null;
-    currency?: string | null;
+    currency?: string | null; // ignored for display
     location?: string | null;
     countryCode?: string | null;
   };
@@ -47,7 +46,7 @@ export default function ListingCard({
             {listing?.title || "Untitled"}
           </h3>
           <div className="text-slate-900 font-medium shrink-0">
-            {formatPrice(listing?.priceCents, listing?.currency)}
+            {formatPriceEUR(listing?.priceCents)}
           </div>
         </div>
         {meta ? <p className="text-sm text-slate-600 mt-1">{meta}</p> : null}
