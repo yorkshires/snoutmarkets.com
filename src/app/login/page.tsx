@@ -1,12 +1,19 @@
+// src/app/login/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function LoginPage() {
-  const [tab, setTab] = useState<"pwd" | "magic">("pwd");
+  const [tab, setTab] = useState<"pwd" | "magic" | "signup">("pwd");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [error, setError] = useState<string>("");
   const [email, setEmail] = useState<string>("");
+
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("error") === "invalid") setError("Wrong email or password.");
+    if (p.get("error") === "exists") setError("An account with this email already exists.");
+  }, []);
 
   async function onMagicSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -15,7 +22,6 @@ export default function LoginPage() {
     try {
       const fd = new FormData(e.currentTarget);
       if (!fd.get("email") && email) fd.set("email", email);
-
       const res = await fetch("/api/auth/magic-link", { method: "POST", body: fd });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -47,9 +53,19 @@ export default function LoginPage() {
         >
           Magic link
         </button>
+        <button
+          className={`px-4 py-2 rounded-lg text-sm ${tab === "signup" ? "bg-orange-600 text-white" : "text-slate-700"}`}
+          onClick={() => setTab("signup")}
+        >
+          Create account
+        </button>
       </div>
 
-      {tab === "pwd" ? (
+      {error && (
+        <div className="mb-4 rounded-xl bg-rose-50 text-rose-800 p-3 text-sm">{error}</div>
+      )}
+
+      {tab === "pwd" && (
         <div className="rounded-2xl border bg-white p-5 mb-6">
           <h2 className="font-semibold mb-3">Email & password</h2>
           <form action="/api/auth/password" method="post" className="grid gap-3">
@@ -76,14 +92,14 @@ export default function LoginPage() {
             </label>
             <button className="rounded-xl bg-orange-600 text-white px-4 py-2">Sign in</button>
           </form>
-          <p className="text-xs text-slate-500 mt-3">Tip: In dev, password defaults to “demo”.</p>
+          <p className="text-xs text-slate-500 mt-3">Tip: In dev, password defaults to “demo” unless you set AUTH_EMAIL / AUTH_PASSWORD.</p>
         </div>
-      ) : (
+      )}
+
+      {tab === "magic" && (
         <div className="rounded-2xl border bg-white p-5">
           <h2 className="font-semibold mb-3">Use a magic link</h2>
-          <p className="text-sm text-slate-600 mb-3">
-            Enter your email and we’ll send you a secure sign-in link.
-          </p>
+          <p className="text-sm text-slate-600 mb-3">Enter your email and we’ll send you a secure sign-in link.</p>
           <form onSubmit={onMagicSubmit} className="grid gap-3">
             <label className="block">
               <span className="text-sm text-slate-700">Email</span>
@@ -98,26 +114,37 @@ export default function LoginPage() {
                 disabled={status === "sending" || status === "sent"}
               />
             </label>
-            <button
-              className="rounded-xl bg-slate-900 text-white px-4 py-2"
-              type="submit"
-              disabled={status === "sending" || status === "sent"}
-            >
-              {status === "sending" ? "Sending…" : "Send verification link"}
+            <button className="rounded-xl bg-slate-900 text-white px-4 py-2" type="submit" disabled={status !== "idle"}>
+              {status === "sending" ? "Sending…" : status === "sent" ? "Link sent" : "Send verification link"}
             </button>
+          </form>
+        </div>
+      )}
 
-            {status === "sent" && (
-              <div className="mt-4 rounded-lg bg-emerald-50 text-emerald-800 p-3 text-sm">
-                Check your inbox. We just sent you a sign-in link. The link expires in 15 minutes.
-                If you can’t find it, look in your spam folder.
-              </div>
-            )}
-
-            {error && (
-              <div className="mt-4 rounded-lg bg-rose-50 text-rose-800 p-3 text-sm">
-                {error}
-              </div>
-            )}
+      {tab === "signup" && (
+        <div className="rounded-2xl border bg-white p-5">
+          <h2 className="font-semibold mb-3">Create your account</h2>
+          <form action="/api/auth/signup" method="post" className="grid gap-3">
+            <label className="block">
+              <span className="text-sm text-slate-700">Email</span>
+              <input
+                name="email"
+                type="email"
+                required
+                className="mt-1 w-full rounded-xl border px-3 py-2"
+                placeholder="you@example.com"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm text-slate-700">Password</span>
+              <input
+                name="password"
+                type="password"
+                required
+                className="mt-1 w-full rounded-xl border px-3 py-2"
+              />
+            </label>
+            <button className="rounded-xl bg-orange-600 text-white px-4 py-2">Create account</button>
           </form>
         </div>
       )}
