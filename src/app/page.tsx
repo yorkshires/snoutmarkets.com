@@ -1,8 +1,16 @@
 // src/app/page.tsx
 import { prisma } from "@/lib/db";
 import ListingCard from "@/components/ListingCard";
+import FilterBar from "@/components/FilterBar";
+import { COUNTRY_NAMES, CountryCode } from "@/lib/europe";
 
-type SearchParams = { q?: string; category?: string; min?: string; max?: string };
+type SearchParams = {
+  q?: string;
+  category?: string;
+  min?: string;
+  max?: string;
+  country?: string; // optional country filter (uses location text)
+};
 
 function parsePrice(v?: string) {
   const n = Number(v);
@@ -14,32 +22,62 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
   const categorySlug = (searchParams?.category ?? "").trim();
   const minPrice = parsePrice(searchParams?.min);
   const maxPrice = parsePrice(searchParams?.max);
+  const countryCode = (searchParams?.country ?? "").toUpperCase() as CountryCode | "";
 
-  const categories = await prisma.category.findMany({ orderBy: { name: "asc" } });
+  const categories = await prisma.category.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, slug: true, name: true },
+  });
 
-  const where: any = {};
+  const where: any = { status: "ACTIVE" as const };
+
   if (q) {
     where.OR = [
       { title: { contains: q, mode: "insensitive" } },
       { description: { contains: q, mode: "insensitive" } },
-      { location: { contains: q, mode: "insensitive" } },
-      { breed: { contains: q, mode: "insensitive" } },
     ];
   }
-  if (categorySlug) where.category = { slug: categorySlug };
-  if (minPrice !== undefined) where.priceCents = { ...(where.priceCents || {}), gte: minPrice };
-  if (maxPrice !== undefined) where.priceCents = { ...(where.priceCents || {}), lte: maxPrice };
+
+  if (categorySlug) {
+    where.category = { is: { slug: categorySlug } };
+  }
+
+  if (minPrice != null || maxPrice != null) {
+    where.priceCents = {};
+    if (minPrice != null) where.priceCents.gte = minPrice;
+    if (maxPrice != null) where.priceCents.lte = maxPrice;
+  }
+
+  // Country filter (best-effort using the free-text 'location' field)
+  if (countryCode) {
+    const name = (COUNTRY_NAMES as any)[countryCode] as string | undefined;
+    where.AND = [
+      {
+        OR: [
+          { location: { contains: countryCode, mode: "insensitive" } },
+          ...(name ? [{ location: { contains: name, mode: "insensitive" } }] : []),
+        ],
+      },
+    ];
+  }
 
   const listings = await prisma.listing.findMany({
     where,
-    include: { category: true },
     orderBy: { createdAt: "desc" },
-    take: 24,
+    take: 30,
+    select: {
+      id: true,
+      title: true,
+      imageUrl: true,
+      priceCents: true,
+      currency: true,
+      location: true,
+    },
   });
 
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-6">
-      {/* Search bar */}
+      {/* Existing hero search */}
       <form className="rounded-2xl bg-orange-50 p-4 md:p-5 flex flex-col md:flex-row gap-3 items-stretch md:items-center" method="get">
         <input
           name="q"
@@ -57,6 +95,9 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
         <input name="max" defaultValue={searchParams?.max || ""} placeholder="Max price" className="w-32 rounded-xl border px-3 py-3" inputMode="numeric" />
         <button type="submit" className="rounded-xl bg-orange-600 text-white font-medium px-6 py-3">Search</button>
       </form>
+
+      {/* Country filter + small Europe map */}
+      <FilterBar />
 
       <div className="text-sm text-gray-600">
         Contact the seller directly — no payments through the platform.
