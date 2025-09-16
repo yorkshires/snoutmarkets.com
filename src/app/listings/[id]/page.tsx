@@ -3,46 +3,41 @@ import { notFound } from "next/navigation";
 import ContactCard from "@/components/ContactCard";
 import { prisma } from "@/lib/db";
 
-function formatPrice(priceCents?: number | null, currency?: string | null) {
+function formatPriceEUR(priceCents?: number | null) {
   if (priceCents == null) return "";
   const value = Math.round(priceCents) / 100;
-  const cur = (currency || "EUR").toUpperCase();
   try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(value);
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR" }).format(value);
   } catch {
-    return `${value.toFixed(2)} ${cur}`;
+    return `${value.toFixed(2)} EUR`;
   }
 }
 
 export default async function ListingPage({ params }: { params: { id: string } }) {
   const listing = await prisma.listing.findUnique({
-    where: { id: params.id }, // if your ID is numeric: where: { id: Number(params.id) }
+    where: { id: params.id },
     include: {
-      user: true,
-      category: true, // need this for category.name
+      user: { select: { email: true, name: true } },
+      category: { select: { name: true } },
     },
   });
+  if (!listing) notFound();
 
-  if (!listing) return notFound();
-
-  const categoryName = (listing.category?.name || "").trim();
-  const metaLine = [categoryName, listing.location || ""].filter(Boolean).join(" • ");
+  const meta: string[] = [];
+  if (listing.category?.name) meta.push(listing.category.name);
+  if (listing.location) meta.push(listing.location);
+  const metaLine = meta.join(" • ");
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 grid md:grid-cols-3 gap-6">
-      <div className="md:col-span-2 rounded-2xl border bg-white shadow-sm overflow-hidden">
+    <div className="grid md:grid-cols-3 gap-6">
+      <div className="md:col-span-2 rounded-2xl overflow-hidden border bg-white">
         {listing.imageUrl ? (
-          <img
-            src={listing.imageUrl}
-            alt={listing.title}
-            className="w-full max-h-[520px] object-cover"
-          />
+          <img src={listing.imageUrl} alt={listing.title} className="w-full object-cover aspect-[16/9]" />
         ) : null}
-
         <div className="p-6">
           <h1 className="text-2xl font-semibold mb-1">{listing.title}</h1>
           <div className="text-lg font-medium text-slate-900 mb-4">
-            {formatPrice(listing.priceCents, listing.currency)}
+            {formatPriceEUR(listing.priceCents)}
           </div>
           {metaLine ? (
             <div className="text-sm text-slate-600 mb-3">{metaLine}</div>
