@@ -1,31 +1,16 @@
 // src/app/account/listings/page.tsx
 import { prisma } from "@/lib/db";
-import { cookies } from "next/headers";
+import { getSessionUserId } from "@/lib/auth";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-// Minimal session: try cookie (sm_uid/uid) else fallback to demo user
-async function ensureUserId(): Promise<string> {
-  const c = cookies();
-  const fromCookie = c.get("sm_uid")?.value || c.get("uid")?.value || null;
-  if (fromCookie) return fromCookie;
-
-  const user = await prisma.user.upsert({
-    where: { email: "demo@snoutmarkets.com" },
-    update: {},
-    create: { email: "demo@snoutmarkets.com", name: "Demo Seller" },
-    select: { id: true },
-  });
-  return user.id;
-}
-
-function formatCurrency(cents: number, currency: string) {
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(cents / 100);
-}
-
 export default async function AccountListingsPage() {
-  const uid = await ensureUserId();
+  const uid = await getSessionUserId();
+  if (!uid) {
+    redirect("/login?next=/account/listings");
+  }
 
   const listings = await prisma.listing.findMany({
     where: { userId: uid },
@@ -34,25 +19,26 @@ export default async function AccountListingsPage() {
   });
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className="max-w-6xl mx-auto px-4 py-10">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">My listings</h1>
-        <Link href="/sell/new" className="rounded-xl bg-orange-600 text-white px-4 py-2">Create</Link>
+        <h1 className="text-3xl font-semibold">My listings</h1>
+        <Link href="/sell/new" className="rounded-xl bg-orange-600 text-white px-4 py-2">
+          Create
+        </Link>
       </div>
 
       {listings.length === 0 ? (
-        <div className="text-gray-600">
-          You don’t have any listings yet.{" "}
-          <Link href="/sell/new" className="underline">Create your first one</Link>.
+        <div className="rounded-xl border bg-orange-50 text-slate-700 p-6">
+          You don’t have any listings yet. Click <strong>Create</strong> to add one.
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="divide-y rounded-xl border bg-white">
           {listings.map((l) => (
-            <div key={l.id} className="rounded-xl border bg-white p-4 flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <div className="font-medium truncate">{l.title}</div>
+            <div key={l.id} className="flex items-center justify-between p-5">
+              <div>
+                <div className="text-lg font-medium">{l.title}</div>
                 <div className="text-sm text-gray-600">
-                  {l.category?.name ?? "—"} • {formatCurrency(l.priceCents, l.currency)} • {l.location || "—"}
+                  {l.category?.name ?? "—"} • {l.currency} {(l.priceCents/100).toFixed(2)} • {l.city ?? "—"}
                 </div>
               </div>
               <div className="flex items-center gap-2">
