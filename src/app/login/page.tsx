@@ -18,6 +18,7 @@ export default function LoginPage() {
     params.get("verify") === "1" || params.get("error") === "verify";
   const expired = params.get("error") === "expired";
   const sentFailed = params.get("sent") === "0";
+  const exists = params.get("error") === "exists";     // <— NEW
 
   useEffect(() => {
     const q = params.get("email");
@@ -45,32 +46,19 @@ export default function LoginPage() {
     <div className="max-w-3xl mx-auto px-4 py-14">
       <div className="flex items-center mb-6">
         <h1 className="text-5xl font-semibold text-slate-900">Sign in</h1>
-        <Link
-          href="/signup"
-          className="ml-auto px-4 py-2 rounded-2xl bg-white border"
-        >
+        <Link href="/signup" className="ml-auto px-4 py-2 rounded-2xl bg-white border">
           Create account
         </Link>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-3 mb-6">
-        <button
-          className={`px-4 py-2 rounded-2xl ${tab === "password" ? "bg-orange-600 text-white" : "bg-white"}`}
-          onClick={() => setTab("password")}
-        >
-          Email & password
-        </button>
-        <button
-          className={`px-4 py-2 rounded-2xl ${tab === "magic" ? "bg-orange-600 text-white" : "bg-white"}`}
-          onClick={() => setTab("magic")}
-        >
-          Magic link
-        </button>
-      </div>
-
       {/* Banners */}
       <div className="space-y-3 mb-4">
+        {exists && (
+          <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-blue-900">
+            An account with <strong>{email || "this email"}</strong> already exists.
+            Please sign in with your password below, or send yourself a magic link on the “Magic link” tab.
+          </div>
+        )}
         {mustVerify && (
           <div className="rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3 text-yellow-900">
             We sent you a verification link. Open the email and click “Verify my email”.
@@ -92,6 +80,22 @@ export default function LoginPage() {
             That verification link expired. Enter your email below and click “Resend verification”.
           </div>
         )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-3 mb-6">
+        <button
+          className={`px-4 py-2 rounded-2xl ${tab === "password" ? "bg-orange-600 text-white" : "bg-white"}`}
+          onClick={() => setTab("password")}
+        >
+          Email & password
+        </button>
+        <button
+          className={`px-4 py-2 rounded-2xl ${tab === "magic" ? "bg-orange-600 text-white" : "bg-white"}`}
+          onClick={() => setTab("magic")}
+        >
+          Magic link
+        </button>
       </div>
 
       <div className="bg-white rounded-3xl p-8 shadow-sm border">
