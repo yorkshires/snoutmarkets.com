@@ -5,36 +5,53 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
+  // Pooled URL for runtime
   url       = env("DATABASE_URL")
+  // Direct URL for prisma db push / migrate / seed
   directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   name         String?
-  role         Role     @default(USER)
-  passwordHash String? // for password login
-  createdAt    DateTime @default(now())
+  role         Role      @default(USER)
+  passwordHash String?   // for password login
+  createdAt    DateTime  @default(now())
 
-  listings  Listing[]
-  inquiries Inquiry[] // <-- has a proper opposite on Inquiry.user
+  listings   Listing[]
+  inquiries  Inquiry[]      // opposite: Inquiry.user
+  profile    SellerProfile? // opposite: SellerProfile.user
 
   @@index([email])
 }
 
-model Listing {
-  id          String        @id @default(cuid())
-  title       String
-  description String
-  priceCents  Int
-  currency    String        @default("DKK")
-  location    String?
-  imageUrl    String?
-  status      ListingStatus @default(ACTIVE)
+model SellerProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id])
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
+  // Common seller fields used in seeds/UI
+  displayName  String
+  phone        String?
+  city         String?
+  countryCode  String?  // store 2-letter code like "DK", "DE"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Listing {
+  id           String        @id @default(cuid())
+  title        String
+  description  String
+  priceCents   Int
+  currency     String        @default("DKK")
+  location     String?
+  imageUrl     String?
+  status       ListingStatus @default(ACTIVE)
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
 
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
@@ -49,7 +66,7 @@ model Listing {
   color        String?
   size         String?
 
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   inquiries Inquiry[]
 
@@ -58,13 +75,13 @@ model Listing {
 }
 
 model Inquiry {
-  id        String  @id @default(cuid())
-  listingId String
-  listing   Listing @relation(fields: [listingId], references: [id])
+  id         String   @id @default(cuid())
 
-  // NEW: link inquiries to a user when available (keeps guest inquiries possible)
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id])
+  listingId  String
+  listing    Listing  @relation(fields: [listingId], references: [id])
+
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
 
   buyerName  String
   buyerEmail String
@@ -72,27 +89,27 @@ model Inquiry {
   ip         String?
   userAgent  String?
 
-  createdAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 
   @@index([listingId])
   @@index([userId])
 }
 
 model MagicLink {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   email     String
-  token     String    @unique
+  token     String   @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([email])
 }
 
 model Category {
-  id   String @id @default(cuid())
-  slug String @unique
-  name String
+  id    String  @id @default(cuid())
+  slug  String  @unique
+  name  String
 
   listings Listing[]
 }
@@ -111,3 +128,4 @@ enum Sex {
   MALE
   FEMALE
 }
+
