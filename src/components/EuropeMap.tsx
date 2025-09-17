@@ -1,8 +1,6 @@
-// src/components/EuropeMap.tsx
 import dynamic from "next/dynamic";
 import type { CountryCode } from "@/lib/europe";
 
-// Important: this keeps react-leaflet out of the server bundle
 const EuropeMapClient = dynamic(() => import("./EuropeMap.client"), {
   ssr: false,
   loading: () => (
@@ -12,9 +10,6 @@ const EuropeMapClient = dynamic(() => import("./EuropeMap.client"), {
   ),
 });
 
-export default function EuropeMap(props: {
-  selected?: CountryCode | null;
-  onSelect?: (cc: CountryCode) => void;
-}) {
+export default function EuropeMap(props: { selected?: CountryCode | null; onSelect?: (cc: CountryCode) => void }) {
   return <EuropeMapClient {...props} />;
 }
