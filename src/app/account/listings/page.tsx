@@ -38,12 +38,16 @@ export default async function AccountListingsPage() {
               <div>
                 <div className="text-lg font-medium">{l.title}</div>
                 <div className="text-sm text-gray-600">
-                  {l.category?.name ?? "—"} • {l.currency} {(l.priceCents/100).toFixed(2)} • {l.city ?? "—"}
+                  {l.category?.name ?? "—"} • {l.currency} {(l.priceCents / 100).toFixed(2)} • {l.location ?? "—"}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Link href={`/listings/${l.id}`} className="rounded-xl border px-3 py-2">View</Link>
-                <Link href={`/sell/edit/${l.id}`} className="rounded-xl border px-3 py-2">Edit</Link>
+                <Link href={`/listings/${l.id}`} className="rounded-xl border px-3 py-2">
+                  View
+                </Link>
+                <Link href={`/sell/edit/${l.id}`} className="rounded-xl border px-3 py-2">
+                  Edit
+                </Link>
                 <form action={`/api/listings/${l.id}/delete`} method="post">
                   <button className="rounded-xl border px-3 py-2 text-red-600">Delete</button>
                 </form>
