@@ -18,16 +18,21 @@ export async function POST(req: NextRequest) {
   const email = String(form.get("email") || "").toLowerCase().trim();
   if (!email) return NextResponse.json({ ok: false, error: "email required" }, { status: 400 });
 
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return NextResponse.json({ ok: true }); // don’t leak existence
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, emailVerifiedAt: true },
+  });
+  if (!user) return NextResponse.json({ ok: true }); // don’t leak
 
   if (user.emailVerifiedAt) {
     return NextResponse.json({ ok: true }); // already verified
   }
 
   await prisma.emailVerificationToken.deleteMany({ where: { userId: user.id } });
+
   const token = randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + 1000 * 60 * 60 * 24);
+
   await prisma.emailVerificationToken.create({
     data: { userId: user.id, token, expiresAt: expires },
   });
@@ -37,10 +42,12 @@ export async function POST(req: NextRequest) {
     <p>Confirm your email for SnoutMarkets.</p>
     <p><a href="${verifyUrl}">Verify my email</a></p>
   `;
+
   try {
     await sendEmail(email, "Confirm your email", html);
   } catch (e) {
     console.error("resend verification failed", e);
   }
+
   return NextResponse.json({ ok: true });
 }
