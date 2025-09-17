@@ -17,7 +17,6 @@ const FormSchema = z.object({
 });
 
 function baseUrl(headers: Headers) {
-  // Prefer explicit envs, then Host/Proto
   const env =
     process.env.APP_BASE_URL ||
     process.env.BASE_URL ||
@@ -36,7 +35,7 @@ export async function POST(req: Request) {
       password: String(form.get("password") || ""),
     });
 
-    // If already verified, send to login with message
+    // If already verified → go to login with notice
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
     if (existing && (existing as any).emailVerifiedAt) {
       const url = new URL("/login", baseUrl(req.headers));
@@ -45,7 +44,7 @@ export async function POST(req: Request) {
       return NextResponse.redirect(url, { status: 303 });
     }
 
-    // Create/update user with password
+    // Create/update password
     const passwordHash = await hashPassword(data.password);
     const user = await prisma.user.upsert({
       where: { email: data.email },
@@ -54,34 +53,34 @@ export async function POST(req: Request) {
       select: { id: true, email: true },
     });
 
-    // Make/replace verification token (use MagicLink table)
+    // Replace any prior tokens
     await prisma.magicLink.deleteMany({ where: { email: user.email } });
+
     const token = randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
     await prisma.magicLink.create({
       data: { email: user.email, token, expiresAt },
     });
 
-    // Build links using absolute base
     const base = baseUrl(req.headers);
     const verifyUrl = new URL("/api/auth/verify", base);
     verifyUrl.searchParams.set("token", token);
 
-    const html = `
-      <p>Confirm your email to finish creating your SnoutMarkets account.</p>
-      <p><a href="${verifyUrl.toString()}">Verify my email</a></p>
-      <p>This link expires in 24 hours.</p>
-    `;
-
     let sentOk = true;
     try {
-      await sendEmail(user.email, "Confirm your email", html);
+      await sendEmail(
+        user.email,
+        "Confirm your email",
+        `<p>Confirm your email to finish creating your SnoutMarkets account.</p>
+         <p><a href="${verifyUrl.toString()}">Verify my email</a></p>
+         <p>This link expires in 24 hours.</p>`
+      );
     } catch (e) {
       sentOk = false;
       console.error("verification email failed", e);
     }
 
-    // ALWAYS redirect with verify=1 & email=… (even if sending failed)
+    // Always go to login with verify banner
     const loginUrl = new URL("/login", base);
     loginUrl.searchParams.set("verify", "1");
     loginUrl.searchParams.set("email", user.email);
