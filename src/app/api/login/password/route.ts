@@ -18,8 +18,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=badcreds", req.url));
   }
 
-  if (!user.emailVerifiedAt) {
-    // Not verified yet
+  // Cast here so TS compiles even if Prisma types are behind
+  if (!(user as any)?.emailVerifiedAt) {
     return NextResponse.redirect(new URL("/login?error=verify", req.url));
   }
 
