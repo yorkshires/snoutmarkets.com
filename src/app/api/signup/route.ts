@@ -1,5 +1,6 @@
 // src/app/api/signup/route.ts
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
@@ -15,17 +16,15 @@ const FormSchema = z.object({
   password: z.string().min(8).max(100),
 });
 
-function originFrom(headers: Headers) {
-  // 1) explicit env
+function baseUrl(headers: Headers) {
+  // Prefer explicit envs, then Host/Proto
   const env =
     process.env.APP_BASE_URL ||
     process.env.BASE_URL ||
     process.env.NEXT_PUBLIC_SITE_URL;
   if (env) return env;
-  // 2) Host header fallback (works when <form> POST has no Origin)
   const host = headers.get("x-forwarded-host") || headers.get("host");
-  const proto =
-    (headers.get("x-forwarded-proto") || "https").split(",")[0].trim();
+  const proto = (headers.get("x-forwarded-proto") || "https").split(",")[0].trim();
   return host ? `${proto}://${host}` : "http://localhost:3000";
 }
 
@@ -37,13 +36,16 @@ export async function POST(req: Request) {
       password: String(form.get("password") || ""),
     });
 
-    // If already verified, block duplicate signups
+    // If already verified, send to login with message
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
     if (existing && (existing as any).emailVerifiedAt) {
-      return NextResponse.redirect(new URL("/login?error=exists", req.url), { status: 303 });
+      const url = new URL("/login", baseUrl(req.headers));
+      url.searchParams.set("error", "exists");
+      url.searchParams.set("email", data.email);
+      return NextResponse.redirect(url, { status: 303 });
     }
 
-    // Create / update user with password
+    // Create/update user with password
     const passwordHash = await hashPassword(data.password);
     const user = await prisma.user.upsert({
       where: { email: data.email },
@@ -52,7 +54,7 @@ export async function POST(req: Request) {
       select: { id: true, email: true },
     });
 
-    // Use MagicLink table for verification token
+    // Make/replace verification token (use MagicLink table)
     await prisma.magicLink.deleteMany({ where: { email: user.email } });
     const token = randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
@@ -60,31 +62,35 @@ export async function POST(req: Request) {
       data: { email: user.email, token, expiresAt },
     });
 
-    const base = originFrom(req.headers);
-    const verifyUrl = `${base}/api/auth/verify?token=${token}`;
+    // Build links using absolute base
+    const base = baseUrl(req.headers);
+    const verifyUrl = new URL("/api/auth/verify", base);
+    verifyUrl.searchParams.set("token", token);
+
     const html = `
       <p>Confirm your email to finish creating your SnoutMarkets account.</p>
-      <p><a href="${verifyUrl}">Verify my email</a></p>
+      <p><a href="${verifyUrl.toString()}">Verify my email</a></p>
       <p>This link expires in 24 hours.</p>
     `;
 
+    let sentOk = true;
     try {
       await sendEmail(user.email, "Confirm your email", html);
-      // Success → always land on banner + prefill email for resend
-      return NextResponse.redirect(
-        new URL(`/login?verify=1&email=${encodeURIComponent(user.email)}`, req.url),
-        { status: 303 }
-      );
     } catch (e) {
+      sentOk = false;
       console.error("verification email failed", e);
-      // Still take them to the banner, but flag that sending failed
-      return NextResponse.redirect(
-        new URL(`/login?verify=1&sent=0&email=${encodeURIComponent(user.email)}`, req.url),
-        { status: 303 }
-      );
     }
+
+    // ALWAYS redirect with verify=1 & email=… (even if sending failed)
+    const loginUrl = new URL("/login", base);
+    loginUrl.searchParams.set("verify", "1");
+    loginUrl.searchParams.set("email", user.email);
+    if (!sentOk) loginUrl.searchParams.set("sent", "0");
+    return NextResponse.redirect(loginUrl, { status: 303 });
   } catch (e) {
     console.error("signup error", e);
-    return NextResponse.redirect(new URL("/login?error=signup", req.url), { status: 303 });
+    const url = new URL("/login", baseUrl(req.headers));
+    url.searchParams.set("error", "signup");
+    return NextResponse.redirect(url, { status: 303 });
   }
 }
