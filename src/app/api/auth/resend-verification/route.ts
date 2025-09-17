@@ -1,4 +1,6 @@
 // src/app/api/auth/resend-verification/route.ts
+export const runtime = "nodejs";
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { randomBytes } from "crypto";
@@ -19,13 +21,12 @@ export async function POST(req: NextRequest) {
   if (!email) return NextResponse.json({ ok: false, error: "email required" }, { status: 400 });
 
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return NextResponse.json({ ok: true }); // don't leak
+  if (!user) return NextResponse.json({ ok: true });
 
   if ((user as any)?.emailVerifiedAt) {
-    return NextResponse.json({ ok: true }); // already verified
+    return NextResponse.json({ ok: true });
   }
 
-  // Reuse MagicLink for verification
   await prisma.magicLink.deleteMany({ where: { email } });
   const token = randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + 1000 * 60 * 60 * 24);
