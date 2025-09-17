@@ -1,153 +1,135 @@
 // src/app/login/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import Link from "next/link";
+
+type Tab = "password" | "magic" | "create";
 
 export default function LoginPage() {
-  const [tab, setTab] = useState<"pwd" | "magic" | "signup">("pwd");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [error, setError] = useState<string>("");
-  const [email, setEmail] = useState<string>("");
-
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    if (p.get("error") === "invalid") setError("Wrong email or password.");
-    if (p.get("error") === "exists") setError("An account with this email already exists.");
-  }, []);
-
-  async function onMagicSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setStatus("sending");
-    setError("");
-    try {
-      const fd = new FormData(e.currentTarget);
-      if (!fd.get("email") && email) fd.set("email", email);
-      const res = await fetch("/api/auth/magic-link", { method: "POST", body: fd });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data?.error || "Could not send the email. Please try again.");
-        setStatus("error");
-        return;
-      }
-      setStatus("sent");
-    } catch {
-      setError("Network error. Please try again.");
-      setStatus("error");
-    }
-  }
+  const [tab, setTab] = useState<Tab>("password");
 
   return (
-    <div className="max-w-lg mx-auto mt-12">
-      <h1 className="text-4xl font-bold mb-4">Sign in</h1>
+    <div className="max-w-3xl mx-auto px-4 py-14">
+      <h1 className="text-5xl font-semibold text-slate-900 mb-6">Sign in</h1>
 
-      <div className="inline-flex rounded-xl border bg-white p-1 mb-6">
+      {/* Tabs */}
+      <div className="flex items-center gap-2 mb-6">
         <button
-          className={`px-4 py-2 rounded-lg text-sm ${tab === "pwd" ? "bg-orange-600 text-white" : "text-slate-700"}`}
-          onClick={() => setTab("pwd")}
+          onClick={() => setTab("password")}
+          className={`px-4 py-2 rounded-2xl border ${tab === "password" ? "bg-orange-600 text-white border-orange-600" : "bg-white text-slate-900"}`}
         >
-          Email & password
+          Email &amp; password
         </button>
         <button
-          className={`px-4 py-2 rounded-lg text-sm ${tab === "magic" ? "bg-orange-600 text-white" : "text-slate-700"}`}
           onClick={() => setTab("magic")}
+          className={`px-4 py-2 rounded-2xl border ${tab === "magic" ? "bg-orange-600 text-white border-orange-600" : "bg-white text-slate-900"}`}
         >
           Magic link
         </button>
         <button
-          className={`px-4 py-2 rounded-lg text-sm ${tab === "signup" ? "bg-orange-600 text-white" : "text-slate-700"}`}
-          onClick={() => setTab("signup")}
+          onClick={() => setTab("create")}
+          className={`ml-auto px-4 py-2 rounded-2xl border ${tab === "create" ? "bg-orange-600 text-white border-orange-600" : "bg-white text-slate-900"}`}
         >
           Create account
         </button>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-xl bg-rose-50 text-rose-800 p-3 text-sm">{error}</div>
-      )}
-
-      {tab === "pwd" && (
-        <div className="rounded-2xl border bg-white p-5 mb-6">
-          <h2 className="font-semibold mb-3">Email & password</h2>
-          <form action="/api/auth/password" method="post" className="grid gap-3">
-            <label className="block">
-              <span className="text-sm text-slate-700">Email</span>
-              <input
-                name="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e)=>setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm text-slate-700">Password</span>
-              <input
-                name="password"
-                type="password"
-                required
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-              />
-            </label>
-            <button className="rounded-xl bg-orange-600 text-white px-4 py-2">Sign in</button>
-          </form>
-          <p className="text-xs text-slate-500 mt-3">Tip: In dev, password defaults to “demo” unless you set AUTH_EMAIL / AUTH_PASSWORD.</p>
-        </div>
-      )}
-
-      {tab === "magic" && (
-        <div className="rounded-2xl border bg-white p-5">
-          <h2 className="font-semibold mb-3">Use a magic link</h2>
-          <p className="text-sm text-slate-600 mb-3">Enter your email and we’ll send you a secure sign-in link.</p>
-          <form onSubmit={onMagicSubmit} className="grid gap-3">
-            <label className="block">
-              <span className="text-sm text-slate-700">Email</span>
-              <input
-                name="email"
-                type="email"
-                placeholder="you@example.com"
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-                required
-                value={email}
-                onChange={(e)=>setEmail(e.target.value)}
-                disabled={status === "sending" || status === "sent"}
-              />
-            </label>
-            <button className="rounded-xl bg-slate-900 text-white px-4 py-2" type="submit" disabled={status !== "idle"}>
-              {status === "sending" ? "Sending…" : status === "sent" ? "Link sent" : "Send verification link"}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {tab === "signup" && (
-        <div className="rounded-2xl border bg-white p-5">
-          <h2 className="font-semibold mb-3">Create your account</h2>
-          <form action="/api/auth/signup" method="post" className="grid gap-3">
-            <label className="block">
-              <span className="text-sm text-slate-700">Email</span>
-              <input
-                name="email"
-                type="email"
-                required
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-                placeholder="you@example.com"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm text-slate-700">Password</span>
-              <input
-                name="password"
-                type="password"
-                required
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-              />
-            </label>
-            <button className="rounded-xl bg-orange-600 text-white px-4 py-2">Create account</button>
-          </form>
-        </div>
-      )}
+      <div className="rounded-2xl border bg-white p-6 md:p-8">
+        {tab === "password" && <PasswordSignInForm />}
+        {tab === "magic" && <MagicLinkForm />}
+        {tab === "create" && <CreateAccountForm />}
+      </div>
     </div>
+  );
+}
+
+function PasswordSignInForm() {
+  return (
+    <form method="post" action="/api/login/password" className="space-y-4">
+      <div>
+        <div className="text-sm text-slate-700 mb-1">Email</div>
+        <input
+          name="email"
+          type="email"
+          required
+          placeholder="you@example.com"
+          className="w-full rounded-2xl border px-4 py-3"
+        />
+      </div>
+      <div>
+        <div className="text-sm text-slate-700 mb-1">Password</div>
+        <input
+          name="password"
+          type="password"
+          required
+          minLength={6}
+          className="w-full rounded-2xl border px-4 py-3"
+        />
+      </div>
+      <button type="submit" className="w-full rounded-2xl bg-orange-600 text-white px-4 py-3">
+        Sign in
+      </button>
+      <p className="text-xs text-slate-500">Tip: In dev, password may default to “demo”.</p>
+    </form>
+  );
+}
+
+function MagicLinkForm() {
+  return (
+    <form method="post" action="/api/login/magic" className="space-y-4">
+      <div>
+        <div className="text-sm text-slate-700 mb-1">Email</div>
+        <input
+          name="email"
+          type="email"
+          required
+          placeholder="you@example.com"
+          className="w-full rounded-2xl border px-4 py-3"
+        />
+      </div>
+      <button type="submit" className="w-full rounded-2xl bg-orange-600 text-white px-4 py-3">
+        Send verification link
+      </button>
+      <p className="text-xs text-slate-500">
+        We’ll email you a secure sign-in link. No password needed.
+      </p>
+    </form>
+  );
+}
+
+function CreateAccountForm() {
+  return (
+    <form method="post" action="/api/signup" className="space-y-4">
+      <h2 className="text-xl font-semibold text-slate-900">Create your account</h2>
+      <div>
+        <div className="text-sm text-slate-700 mb-1">Email</div>
+        <input
+          name="email"
+          type="email"
+          required
+          placeholder="you@example.com"
+          className="w-full rounded-2xl border px-4 py-3"
+        />
+      </div>
+      <div>
+        <div className="text-sm text-slate-700 mb-1">Password</div>
+        <input
+          name="password"
+          type="password"
+          required
+          minLength={6}
+          className="w-full rounded-2xl border px-4 py-3"
+        />
+      </div>
+      <button type="submit" className="w-full rounded-2xl bg-orange-600 text-white px-4 py-3">
+        Create account
+      </button>
+      <p className="text-xs text-slate-500">
+        By continuing you agree to our{" "}
+        <Link href="/terms" className="underline">Terms</Link> and{" "}
+        <Link href="/privacy" className="underline">Privacy</Link>.
+      </p>
+    </form>
   );
 }
