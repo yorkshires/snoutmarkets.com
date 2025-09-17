@@ -14,12 +14,18 @@ export default function LoginPage() {
   const [resendStatus, setResendStatus] =
     useState<"idle" | "sending" | "sent" | "fail">("idle");
 
+  // Read all possible flags
+  const exists = params.get("error") === "exists";
   const mustVerify =
     params.get("verify") === "1" || params.get("error") === "verify";
+  const badCreds = params.get("error") === "badcreds";
+  const invalid = params.get("error") === "invalid";
+  const server = params.get("error") === "server";
   const expired = params.get("error") === "expired";
+  const magicSent = params.get("magic") === "sent";
   const sentFailed = params.get("sent") === "0";
-  const exists = params.get("error") === "exists";     // <— NEW
 
+  // Prefill email from ?email
   useEffect(() => {
     const q = params.get("email");
     if (q) setEmail(q);
@@ -56,13 +62,13 @@ export default function LoginPage() {
         {exists && (
           <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-blue-900">
             An account with <strong>{email || "this email"}</strong> already exists.
-            Please sign in with your password below, or send yourself a magic link on the “Magic link” tab.
+            Please sign in with your password below, or send yourself a magic link.
           </div>
         )}
         {mustVerify && (
           <div className="rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3 text-yellow-900">
             We sent you a verification link. Open the email and click “Verify my email”.
-            {sentFailed && <span className="ml-2 text-red-700">Sending failed. Use “Resend verification”.</span>}
+            {sentFailed && <span className="ml-2 text-red-700">Sending failed. Try “Resend verification”.</span>}
             {" "}
             <button
               onClick={handleResend}
@@ -75,9 +81,29 @@ export default function LoginPage() {
             {resendStatus === "fail" && <span className="ml-2 text-red-700">Failed</span>}
           </div>
         )}
+        {badCreds && (
+          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-red-800">
+            Incorrect email or password. Please try again.
+          </div>
+        )}
+        {invalid && (
+          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-red-800">
+            Please enter a valid email and password.
+          </div>
+        )}
+        {server && (
+          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-red-800">
+            Something went wrong. Please try again.
+          </div>
+        )}
         {expired && (
           <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-red-800">
             That verification link expired. Enter your email below and click “Resend verification”.
+          </div>
+        )}
+        {magicSent && (
+          <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-green-800">
+            Magic link sent! Check your inbox.
           </div>
         )}
       </div>
