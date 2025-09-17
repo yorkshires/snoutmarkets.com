@@ -18,22 +18,19 @@ export async function POST(req: NextRequest) {
   const email = String(form.get("email") || "").toLowerCase().trim();
   if (!email) return NextResponse.json({ ok: false, error: "email required" }, { status: 400 });
 
-  // No select (keeps TS happy even if Prisma types don’t include the new column yet)
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) return NextResponse.json({ ok: true }); // don't leak
 
-  // Cast only where we read the new column
   if ((user as any)?.emailVerifiedAt) {
     return NextResponse.json({ ok: true }); // already verified
   }
 
-  await prisma.emailVerificationToken.deleteMany({ where: { userId: user.id } });
-
+  // Reuse MagicLink for verification
+  await prisma.magicLink.deleteMany({ where: { email } });
   const token = randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + 1000 * 60 * 60 * 24);
-
-  await prisma.emailVerificationToken.create({
-    data: { userId: user.id, token, expiresAt: expires },
+  await prisma.magicLink.create({
+    data: { email, token, expiresAt: expires },
   });
 
   const verifyUrl = `${originFrom(req)}/api/auth/verify?token=${token}`;
@@ -41,12 +38,10 @@ export async function POST(req: NextRequest) {
     <p>Confirm your email for SnoutMarkets.</p>
     <p><a href="${verifyUrl}">Verify my email</a></p>
   `;
-
   try {
     await sendEmail(email, "Confirm your email", html);
   } catch (e) {
     console.error("resend verification failed", e);
   }
-
   return NextResponse.json({ ok: true });
 }
