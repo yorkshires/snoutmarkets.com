@@ -16,7 +16,7 @@ export default async function Header() {
             alt="SnoutMarkets"
             width={28}
             height={28}
-            className="rounded-lg"
+            className="rounded"
             priority
           />
           <span className="text-2xl font-semibold tracking-tight text-slate-900">
@@ -25,9 +25,11 @@ export default async function Header() {
         </Link>
 
         <nav className="flex items-center gap-3">
-          <Link href="/account/listings" className="text-sm text-slate-700 hover:underline">
-            My listings
-          </Link>
+          {isAuthed && (
+            <Link href="/account/listings" className="text-sm text-slate-700 hover:underline">
+              My listings
+            </Link>
+          )}
           {isAuthed ? (
             <form action="/logout" method="post">
               <button
