@@ -3,13 +3,9 @@ import "./globals.css";
 import Link from "next/link";
 import { getSessionUserId } from "@/lib/auth";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-export const fetchCache = "default-no-store";
-
 export const metadata = {
   title: "SnoutMarkets",
-  description: "Buy & sell dogs and gear",
+  description: "Buy & sell dogs and gear across Europe",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -28,7 +24,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body className="min-h-screen bg-orange-50 text-slate-900">
-        {/* Header */}
         <header className="border-b bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/60">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2 shrink-0" aria-label="SnoutMarkets">
@@ -49,17 +44,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </header>
 
-        {/* Page */}
         <main className="max-w-6xl mx-auto px-4 md:px-6 py-6">
           {children}
         </main>
 
-        {/* Footer */}
         <footer className="border-t bg-white mt-10">
           <div className="max-w-6xl mx-auto px-4 py-8 grid sm:grid-cols-2 items-center">
             <div className="text-sm text-gray-600">
               <div className="font-semibold text-slate-900">SnoutMarkets</div>
-              <div>Buy & sell dogs and gear across Europe. Contact sellers directly — no payments through the platform.</div>
+              <div>
+                Buy & sell dogs and gear across Europe. Contact sellers directly — no payments through the platform.
+              </div>
             </div>
             <div className="flex justify-end gap-6 text-sm text-gray-600 mt-4 sm:mt-0">
               <Link href="/privacy">Privacy</Link>
