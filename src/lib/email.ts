@@ -2,7 +2,6 @@
 import { Resend } from "resend";
 
 const resendKey = process.env.RESEND_API_KEY || "";
-// Use a sender that works even if your domain isn't verified yet:
 const fromEmail =
   process.env.FROM_EMAIL || "SnoutMarkets <onboarding@resend.dev>";
 
