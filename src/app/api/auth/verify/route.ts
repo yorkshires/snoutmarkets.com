@@ -9,23 +9,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=invalid", req.url));
   }
 
-  const record = await prisma.emailVerificationToken.findUnique({ where: { token } });
+  // Read from MagicLink table
+  const record = await prisma.magicLink.findUnique({ where: { token } });
   if (!record || record.usedAt || record.expiresAt < new Date()) {
     return NextResponse.redirect(new URL("/login?error=expired", req.url));
   }
 
+  const user = await prisma.user.findUnique({ where: { email: record.email } });
+  if (!user) {
+    return NextResponse.redirect(new URL("/login?error=invalid", req.url));
+  }
+
   await prisma.$transaction(async (tx) => {
-    await tx.emailVerificationToken.update({
+    await tx.magicLink.update({
       where: { token },
       data: { usedAt: new Date() },
     });
-    // Cast only this update so TS compiles even if the field isn't in the generated types yet
     await tx.user.update({
-      where: { id: record.userId },
+      where: { id: user.id },
       data: { emailVerifiedAt: new Date() } as any,
     });
   });
 
-  await createSession(record.userId);
+  await createSession(user.id);
   return NextResponse.redirect(new URL("/account/listings", req.url));
 }
