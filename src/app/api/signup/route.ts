@@ -1,12 +1,12 @@
 // src/app/api/signup/route.ts
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { hashPassword } from "@/lib/password";
 import { randomBytes } from "crypto";
 import { sendEmail } from "@/lib/email";
-
-export const runtime = "nodejs"; // Node runtime (crypto)
 
 const prisma = new PrismaClient();
 
@@ -16,12 +16,17 @@ const FormSchema = z.object({
 });
 
 function originFrom(headers: Headers) {
-  return (
+  // 1) explicit env
+  const env =
     process.env.APP_BASE_URL ||
     process.env.BASE_URL ||
-    headers.get("origin") ||
-    "http://localhost:3000"
-  );
+    process.env.NEXT_PUBLIC_SITE_URL;
+  if (env) return env;
+  // 2) Host header fallback (works when <form> POST has no Origin)
+  const host = headers.get("x-forwarded-host") || headers.get("host");
+  const proto =
+    (headers.get("x-forwarded-proto") || "https").split(",")[0].trim();
+  return host ? `${proto}://${host}` : "http://localhost:3000";
 }
 
 export async function POST(req: Request) {
@@ -32,11 +37,13 @@ export async function POST(req: Request) {
       password: String(form.get("password") || ""),
     });
 
+    // If already verified, block duplicate signups
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
     if (existing && (existing as any).emailVerifiedAt) {
       return NextResponse.redirect(new URL("/login?error=exists", req.url), { status: 303 });
     }
 
+    // Create / update user with password
     const passwordHash = await hashPassword(data.password);
     const user = await prisma.user.upsert({
       where: { email: data.email },
@@ -53,19 +60,29 @@ export async function POST(req: Request) {
       data: { email: user.email, token, expiresAt },
     });
 
-    const verifyUrl = `${originFrom(req.headers)}/api/auth/verify?token=${token}`;
+    const base = originFrom(req.headers);
+    const verifyUrl = `${base}/api/auth/verify?token=${token}`;
     const html = `
       <p>Confirm your email to finish creating your SnoutMarkets account.</p>
       <p><a href="${verifyUrl}">Verify my email</a></p>
       <p>This link expires in 24 hours.</p>
     `;
+
     try {
       await sendEmail(user.email, "Confirm your email", html);
+      // Success → always land on banner + prefill email for resend
+      return NextResponse.redirect(
+        new URL(`/login?verify=1&email=${encodeURIComponent(user.email)}`, req.url),
+        { status: 303 }
+      );
     } catch (e) {
       console.error("verification email failed", e);
+      // Still take them to the banner, but flag that sending failed
+      return NextResponse.redirect(
+        new URL(`/login?verify=1&sent=0&email=${encodeURIComponent(user.email)}`, req.url),
+        { status: 303 }
+      );
     }
-
-    return NextResponse.redirect(new URL("/login?verify=1", req.url), { status: 303 });
   } catch (e) {
     console.error("signup error", e);
     return NextResponse.redirect(new URL("/login?error=signup", req.url), { status: 303 });
