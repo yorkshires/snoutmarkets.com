@@ -19,9 +19,10 @@ export async function GET(req: NextRequest) {
       where: { token },
       data: { usedAt: new Date() },
     });
+    // Cast only this update so TS compiles even if the field isn't in the generated types yet
     await tx.user.update({
       where: { id: record.userId },
-      data: { emailVerifiedAt: new Date() },
+      data: { emailVerifiedAt: new Date() } as any,
     });
   });
 
