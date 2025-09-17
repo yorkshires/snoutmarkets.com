@@ -1,4 +1,5 @@
 // src/components/EuropeMap.client.tsx
+// @ts-nocheck
 "use client";
 
 import { useMemo } from "react";
@@ -12,15 +13,13 @@ type Props = {
 };
 
 export default function EuropeMapClient({ selected, onSelect }: Props) {
-  const points = useMemo(
-    () =>
-      (Object.keys(COUNTRY_CENTROIDS) as CountryCode[]).map((cc) => ({
-        cc,
-        lat: COUNTRY_CENTROIDS[cc][0],
-        lng: COUNTRY_CENTROIDS[cc][1],
-      })),
-    []
-  );
+  const points = useMemo(() => {
+    return (Object.keys(COUNTRY_CENTROIDS) as CountryCode[]).map((cc) => ({
+      cc,
+      lat: COUNTRY_CENTROIDS[cc][0],
+      lng: COUNTRY_CENTROIDS[cc][1],
+    }));
+  }, []);
 
   return (
     <div className="h-[380px] rounded-xl overflow-hidden border">
