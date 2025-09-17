@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createSession } from "@/lib/auth";
-import { verifyPassword } from "@/lib/passwords";
+import { verifyPassword } from "@/lib/password";
 
 export async function POST(req: NextRequest) {
   const form = await req.formData();
@@ -13,36 +13,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=invalid", req.url));
   }
 
-  // 1) Real user with passwordHash?
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, passwordHash: true },
-  });
-
-  if (user?.passwordHash && (await verifyPassword(password, user.passwordHash))) {
-    await createSession(user.id);
-    return NextResponse.redirect(new URL("/", req.url));
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || !user.passwordHash) {
+    return NextResponse.redirect(new URL("/login?error=badcreds", req.url));
   }
 
-  // 2) DEV whitelist via env (keeps your previous behavior)
-  const allowedEmail = (process.env.AUTH_EMAIL || "").toLowerCase().trim();
-  const allowedPass = process.env.AUTH_PASSWORD || "demo";
-  const allowed =
-    (allowedEmail && email === allowedEmail && password === allowedPass) ||
-    (!allowedEmail && password === allowedPass);
-
-  if (allowed) {
-    // ensure user exists
-    const u = await prisma.user.upsert({
-      where: { email },
-      update: {},
-      create: { email },
-      select: { id: true },
-    });
-    await createSession(u.id);
-    return NextResponse.redirect(new URL("/", req.url));
+  if (!(user as any)?.emailVerifiedAt) {
+    return NextResponse.redirect(new URL("/login?error=verify", req.url));
   }
 
-  // 3) Fail
-  return NextResponse.redirect(new URL("/login?error=invalid", req.url));
+  const ok = await verifyPassword(password, user.passwordHash);
+  if (!ok) {
+    return NextResponse.redirect(new URL("/login?error=badcreds", req.url));
+  }
+
+  await createSession(user.id);
+  return NextResponse.redirect(new URL("/", req.url));
 }
