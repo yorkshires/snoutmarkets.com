@@ -1,11 +1,10 @@
 // src/app/api/signup/route.ts
-// Create-account endpoint for form POSTs
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { hashPassword } from "@/lib/password";
 
-// Force Node.js runtime (Edge has no Node crypto)
+// Node runtime (crypto support)
 export const runtime = "nodejs";
 
 const prisma = new PrismaClient();
@@ -37,24 +36,20 @@ export async function POST(req: Request) {
       select: { id: true, email: true },
     });
 
-    // Best-effort: create a minimal SellerProfile if the model exists
-    // (ignore if not present in this DB yet)
-    await prisma.$executeRawUnsafe?.(
-      "" // no-op, ensures try/catch path compiles even if you remove this block later
-    );
+    // Best-effort: create a minimal seller profile if table exists
     try {
-      // @ts-ignore — optional; depends on your schema
+      // @ts-ignore (optional relation depending on your schema)
       await prisma.sellerProfile.create({
         data: { userId: user.id, displayName: email.split("@")[0] },
       });
     } catch {
-      // harmless if SellerProfile table doesn't exist yet
+      /* ignore if SellerProfile not present */
     }
 
-    // Redirect back to login with success notice (you can auto-login here if desired)
+    // Success → back to login
     return NextResponse.redirect(new URL("/login?created=1", req.url), { status: 303 });
-  } catch (err) {
-    console.error("signup error", err);
+  } catch (e) {
+    console.error("signup error", e);
     return NextResponse.redirect(new URL("/login?error=signup", req.url), { status: 303 });
   }
 }
