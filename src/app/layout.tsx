@@ -52,9 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <div className="max-w-6xl mx-auto px-4 py-8 grid sm:grid-cols-2 items-center">
             <div className="text-sm text-gray-600">
               <div className="font-semibold text-slate-900">SnoutMarkets</div>
-              <div>
-                Buy & sell dogs and gear across Europe. Contact sellers directly — no payments through the platform.
-              </div>
+              <div>Buy & sell dogs and gear across Europe. Contact sellers directly — no payments through the platform.</div>
             </div>
             <div className="flex justify-end gap-6 text-sm text-gray-600 mt-4 sm:mt-0">
               <Link href="/privacy">Privacy</Link>
