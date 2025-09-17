@@ -9,7 +9,8 @@ export default function SignupPage() {
   const params = useSearchParams();
   const [email, setEmail] = useState("");
 
-  // Prefill from ?email=
+  const invalid = params.get("error") === "invalid";
+
   useEffect(() => {
     const q = params.get("email");
     if (q) setEmail(q);
@@ -18,6 +19,12 @@ export default function SignupPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-14">
       <h1 className="text-5xl font-semibold text-slate-900 mb-6">Create account</h1>
+
+      {invalid && (
+        <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-red-800">
+          Please use a valid email and a password of at least 8 characters.
+        </div>
+      )}
 
       <div className="bg-white rounded-3xl p-8 shadow-sm border">
         <form method="POST" action="/api/signup" className="space-y-5">
@@ -47,8 +54,7 @@ export default function SignupPage() {
             Create account
           </button>
           <p className="text-sm text-slate-600">
-            Already have an account?{" "}
-            <Link href="/login" className="underline">Sign in</Link>
+            Already have an account? <Link href="/login" className="underline">Sign in</Link>
           </p>
         </form>
       </div>
