@@ -32,13 +32,11 @@ export async function POST(req: Request) {
       password: String(form.get("password") || ""),
     });
 
-    // If already verified, block duplicate signups
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
-    if (existing && existing.emailVerifiedAt) {
+    if (existing && (existing as any).emailVerifiedAt) {
       return NextResponse.redirect(new URL("/login?error=exists", req.url), { status: 303 });
     }
 
-    // Create or update the user with a fresh password hash
     const passwordHash = await hashPassword(data.password);
     const user = await prisma.user.upsert({
       where: { email: data.email },
@@ -47,15 +45,14 @@ export async function POST(req: Request) {
       select: { id: true, email: true },
     });
 
-    // Create a 24h verification token (remove any previous)
-    await prisma.emailVerificationToken.deleteMany({ where: { userId: user.id } });
+    // Use MagicLink table for verification token
+    await prisma.magicLink.deleteMany({ where: { email: user.email } });
     const token = randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
-    await prisma.emailVerificationToken.create({
-      data: { userId: user.id, token, expiresAt },
+    await prisma.magicLink.create({
+      data: { email: user.email, token, expiresAt },
     });
 
-    // Send verification email via Resend
     const verifyUrl = `${originFrom(req.headers)}/api/auth/verify?token=${token}`;
     const html = `
       <p>Confirm your email to finish creating your SnoutMarkets account.</p>
@@ -68,7 +65,6 @@ export async function POST(req: Request) {
       console.error("verification email failed", e);
     }
 
-    // Tell them to check their inbox
     return NextResponse.redirect(new URL("/login?verify=1", req.url), { status: 303 });
   } catch (e) {
     console.error("signup error", e);
