@@ -13,47 +13,44 @@ function withParams(req: NextRequest, params: Record<string, string>) {
 }
 
 export async function POST(req: NextRequest) {
+  let stage = "start";
+  const redirect = (params: Record<string, string>) =>
+    NextResponse.redirect(withParams(req, params), { status: 303 });
+
   try {
+    stage = "read-form";
     const form = await req.formData();
     const email = String(form.get("email") || "").toLowerCase().trim();
     const password = String(form.get("password") || "");
 
     if (!email || !password) {
-      return NextResponse.redirect(
-        withParams(req, { error: "invalid", email }),
-        { status: 303 }
-      );
+      return redirect({ error: "invalid", email, stage });
     }
 
+    stage = "find-user";
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !user.passwordHash) {
-      return NextResponse.redirect(
-        withParams(req, { error: "badcreds", email }),
-        { status: 303 }
-      );
+      return redirect({ error: "badcreds", email, stage });
     }
 
+    stage = "check-verified";
     if (!(user as any).emailVerifiedAt) {
-      return NextResponse.redirect(
-        withParams(req, { error: "verify", email }),
-        { status: 303 }
-      );
+      return redirect({ error: "verify", email, stage });
     }
 
+    stage = "verify-password";
     const ok = await verifyPassword(password, user.passwordHash);
     if (!ok) {
-      return NextResponse.redirect(
-        withParams(req, { error: "badcreds", email }),
-        { status: 303 }
-      );
+      return redirect({ error: "badcreds", email, stage });
     }
 
+    stage = "create-session";
     await createSession(user.id);
+
+    stage = "done";
     return NextResponse.redirect(new URL("/", req.url), { status: 303 });
   } catch (err) {
-    console.error("password login error", err);
-    return NextResponse.redirect(withParams(req, { error: "server" }), {
-      status: 303,
-    });
+    console.error("password login error, stage =", stage, err);
+    return redirect({ error: "server", stage });
   }
 }
