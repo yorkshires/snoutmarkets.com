@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!(user as any)?.emailVerifiedAt) {
+    // Require verification before allowing password login
+    if (!(user as any).emailVerifiedAt) {
       return NextResponse.redirect(
         withParams(req, { error: "verify", email }),
         { status: 303 }
