@@ -1,24 +1,26 @@
-// src/lib/passwords.ts
+// src/lib/password.ts
 import { randomBytes, scrypt as _scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+
 const scrypt = promisify(_scrypt);
 
-const ALG = "scrypt";
-const KEYLEN = 64;
-
-export async function hashPassword(plain: string): Promise<string> {
-  const salt = randomBytes(16);
-  const derived = (await scrypt(plain, salt, KEYLEN)) as Buffer;
-  return `${ALG}:${salt.toString("hex")}:${derived.toString("hex")}`;
+/**
+ * Hash a password with scrypt.
+ * Stored format: "s2:<hex salt>:<hex hash>"
+ */
+export async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const buf = (await scrypt(password, salt, 64)) as Buffer;
+  return `s2:${salt}:${buf.toString("hex")}`;
 }
 
-export async function verifyPassword(plain: string, stored?: string | null): Promise<boolean> {
-  if (!stored) return false;
-  const [alg, saltHex, hashHex] = stored.split(":");
-  if (alg !== ALG || !saltHex || !hashHex) return false;
-  const salt = Buffer.from(saltHex, "hex");
-  const expected = Buffer.from(hashHex, "hex");
-  const got = (await scrypt(plain, salt, expected.length)) as Buffer;
-  // Use constant-time compare
+/**
+ * Verify a plaintext password against a stored scrypt hash.
+ */
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const [scheme, salt, hex] = String(stored).split(":");
+  if (scheme !== "s2" || !salt || !hex) return false;
+  const expected = Buffer.from(hex, "hex");
+  const got = (await scrypt(password, salt, 64)) as Buffer;
   return got.length === expected.length && timingSafeEqual(got, expected);
 }
