@@ -69,8 +69,13 @@ export default function FilterBar() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          Tip: set both fields and click “Apply distance” to hide far-away countries.
+        <div className="rounded-xl border bg-white p-3 text-sm text-slate-700">
+          <p className="font-medium mb-1">How the distance filter works</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Set <em>My country</em> and a <em>Max distance</em> to hide far-away countries.</li>
+            <li>Distance is calculated “as the crow flies”.</li>
+            <li>Click any marker on the map to filter by that country instantly.</li>
+          </ul>
         </div>
       </div>
 
