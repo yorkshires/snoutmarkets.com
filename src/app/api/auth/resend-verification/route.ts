@@ -18,13 +18,12 @@ export async function POST(req: NextRequest) {
   const email = String(form.get("email") || "").toLowerCase().trim();
   if (!email) return NextResponse.json({ ok: false, error: "email required" }, { status: 400 });
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, emailVerifiedAt: true },
-  });
-  if (!user) return NextResponse.json({ ok: true }); // don’t leak
+  // No select (keeps TS happy even if Prisma types don’t include the new column yet)
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return NextResponse.json({ ok: true }); // don't leak
 
-  if (user.emailVerifiedAt) {
+  // Cast only where we read the new column
+  if ((user as any)?.emailVerifiedAt) {
     return NextResponse.json({ ok: true }); // already verified
   }
 
