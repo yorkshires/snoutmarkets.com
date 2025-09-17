@@ -33,18 +33,27 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await hashPassword(password);
 
-    // Upsert so it works whether the user exists or not.
+    // Build update/create data. `any` lets us add emailVerifiedAt when needed.
     const data: any = { passwordHash };
     if (verify) data.emailVerifiedAt = new Date();
 
-    const user = await prisma.user.upsert({
+    await prisma.user.upsert({
       where: { email },
       update: data,
       create: { email, ...data },
-      select: { id: true, email: true, emailVerifiedAt: true },
     });
 
-    return NextResponse.json({ ok: true, user });
+    // Fetch a minimal, always-safe shape
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      user,
+      verifyApplied: verify,
+    });
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: String(e?.message || e) },
