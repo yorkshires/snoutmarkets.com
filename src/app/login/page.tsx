@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-type Tab = "password" | "magic" | "create";
+type Tab = "password" | "magic";
 
 export default function LoginPage() {
   const params = useSearchParams();
@@ -16,16 +16,13 @@ export default function LoginPage() {
 
   const mustVerify =
     params.get("verify") === "1" || params.get("error") === "verify";
-  const created = params.get("created") === "1";
   const expired = params.get("error") === "expired";
   const sentFailed = params.get("sent") === "0";
 
-  // Prefill email from query (?email=...)
   useEffect(() => {
     const q = params.get("email");
     if (q) setEmail(q);
-    if (mustVerify) setTab("password");
-  }, [params, mustVerify]);
+  }, [params]);
 
   async function handleResend(e: React.MouseEvent) {
     e.preventDefault();
@@ -46,48 +43,39 @@ export default function LoginPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-14">
-      <h1 className="text-5xl font-semibold text-slate-900 mb-6">Sign in</h1>
+      <div className="flex items-center mb-6">
+        <h1 className="text-5xl font-semibold text-slate-900">Sign in</h1>
+        <Link
+          href="/signup"
+          className="ml-auto px-4 py-2 rounded-2xl bg-white border"
+        >
+          Create account
+        </Link>
+      </div>
 
+      {/* Tabs */}
       <div className="flex gap-3 mb-6">
         <button
-          className={`px-4 py-2 rounded-2xl ${
-            tab === "password" ? "bg-orange-600 text-white" : "bg-white"
-          }`}
+          className={`px-4 py-2 rounded-2xl ${tab === "password" ? "bg-orange-600 text-white" : "bg-white"}`}
           onClick={() => setTab("password")}
         >
           Email & password
         </button>
         <button
-          className={`px-4 py-2 rounded-2xl ${
-            tab === "magic" ? "bg-orange-600 text-white" : "bg-white"
-          }`}
+          className={`px-4 py-2 rounded-2xl ${tab === "magic" ? "bg-orange-600 text-white" : "bg-white"}`}
           onClick={() => setTab("magic")}
         >
           Magic link
-        </button>
-        <button
-          className={`ml-auto px-4 py-2 rounded-2xl ${
-            tab === "create" ? "bg-orange-600 text-white" : "bg-white"
-          }`}
-          onClick={() => setTab("create")}
-        >
-          Create account
         </button>
       </div>
 
       {/* Banners */}
       <div className="space-y-3 mb-4">
-        {created && (
-          <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-green-800">
-            Account created. Please verify your email to continue.
-          </div>
-        )}
         {mustVerify && (
           <div className="rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3 text-yellow-900">
             We sent you a verification link. Open the email and click “Verify my email”.
             {sentFailed && <span className="ml-2 text-red-700">Sending failed. Use “Resend verification”.</span>}
             {" "}
-            Didn’t get it?{" "}
             <button
               onClick={handleResend}
               className="underline font-medium"
@@ -161,40 +149,6 @@ export default function LoginPage() {
             <button type="submit" className="w-full rounded-2xl bg-orange-600 text-white px-4 py-3">
               Send magic link
             </button>
-          </form>
-        )}
-
-        {tab === "create" && (
-          <form method="POST" action="/api/signup" className="space-y-5">
-            <div>
-              <label className="block mb-2">Email</label>
-              <input
-                name="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-2xl border px-4 py-3"
-              />
-            </div>
-            <div>
-              <label className="block mb-2">Password</label>
-              <input
-                name="password"
-                type="password"
-                required
-                minLength={8}
-                className="w-full rounded-2xl border px-4 py-3"
-              />
-            </div>
-            <button type="submit" className="w-full rounded-2xl bg-orange-600 text-white px-4 py-3">
-              Create account
-            </button>
-            <p className="text-xs text-slate-500">
-              By continuing you agree to our{" "}
-              <Link href="/terms" className="underline">Terms</Link> and{" "}
-              <Link href="/privacy" className="underline">Privacy</Link>.
-            </p>
           </form>
         )}
       </div>
