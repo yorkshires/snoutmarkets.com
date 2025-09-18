@@ -1,5 +1,6 @@
+// src/lib/password-reset.ts
 import crypto from "crypto";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db";
 
 export function generateRawToken(bytes = 32) {
   return crypto.randomBytes(bytes).toString("hex"); // send this by email
