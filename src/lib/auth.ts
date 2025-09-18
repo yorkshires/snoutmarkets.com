@@ -6,8 +6,8 @@ import { prisma } from "@/lib/db";
 
 export const SESSION_COOKIE = "snout_session";
 
+/** Resolve the secret key for signing/verifying session JWTs. */
 function secretKey() {
-  // Support any of these env names to avoid breakage
   const raw =
     process.env.AUTH_SECRET ||
     process.env.JWT_SECRET ||
@@ -18,40 +18,35 @@ function secretKey() {
   return new TextEncoder().encode(raw);
 }
 
-/**
- * Create a signed session token and set it as a cookie.
- * Works in Route Handlers (with or without a NextResponse).
- * Returns the token so callers can use it if needed.
- */
+type SessionPayload = JWTPayload & { uid: string };
+
+/** Create a session (set cookie). Works both in route handlers and server actions. */
 export async function createSession(
   userId: string,
   res?: NextResponse
-): Promise<string> {
-  const token = await new SignJWT({ uid: userId })
+): Promise<void> {
+  const token = await new SignJWT({ uid: userId } as SessionPayload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
     .sign(secretKey());
 
-  const cookieOpts = {
+  const maxAge = 60 * 60 * 24 * 30; // 30 days
+  const opts = {
     httpOnly: true,
-    sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
     path: "/",
-    maxAge: 60 * 60 * 24 * 30, // 30 days
+    maxAge,
     domain: process.env.COOKIE_DOMAIN || undefined,
   };
 
   if (res) {
-    res.cookies.set(SESSION_COOKIE, token, cookieOpts);
+    res.cookies.set(SESSION_COOKIE, token, opts);
   } else {
-    try {
-      cookies().set(SESSION_COOKIE, token, cookieOpts);
-    } catch {
-      // ignore if not in a cookies() context
-    }
+    // inside a request/server component
+    cookies().set(SESSION_COOKIE, token, opts);
   }
-  return token;
 }
 
 /** Verify the current session cookie and return the user id (or null). */
@@ -60,7 +55,7 @@ export async function getSessionUserId(): Promise<string | null> {
     const token = cookies().get(SESSION_COOKIE)?.value;
     if (!token) return null;
     const { payload } = await jwtVerify(token, secretKey());
-    return (payload as JWTPayload & { uid?: string }).uid ?? null;
+    return (payload as SessionPayload).uid ?? null;
   } catch {
     return null;
   }
