@@ -1,27 +1,8 @@
 // src/app/api/auth/request-password-reset/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { createPasswordReset } from "@/lib/password-reset";
+import { createPasswordResetToken } from "@/lib/password-reset";
 import { sendEmail } from "@/lib/email";
-
-const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 5;
-
-// very simple in-memory rate limiter (use redis in prod)
-const rl = new Map<string, { count: number; ts: number }>();
-
-function rateLimited(key: string) {
-  const now = Date.now();
-  const rec = rl.get(key);
-  if (!rec || now - rec.ts > RATE_LIMIT_WINDOW_MS) {
-    rl.set(key, { count: 1, ts: now });
-    return false;
-  }
-  rec.count++;
-  rec.ts = now;
-  return rec.count > RATE_LIMIT_MAX;
-}
 
 export async function POST(req: Request) {
   const { email } = await req.json().catch(() => ({}));
@@ -29,31 +10,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Email required" }, { status: 400 });
   }
 
-  const key = `r:${email}`;
-  if (rateLimited(key)) {
-    // Always 200 to avoid user enumeration
-    return NextResponse.json({ ok: true });
-  }
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase().trim() },
+    select: { id: true, email: true },
+  });
 
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
-  if (!user) {
-    // Always 200 to avoid leaking which emails exist
-    return NextResponse.json({ ok: true });
-  }
+  // Always respond 200 to prevent user enumeration
+  if (!user) return NextResponse.json({ ok: true });
 
-  const { raw, expiresAt } = await createPasswordReset(user.id, 30);
-  const link = `${APP_URL}/reset-password?token=${raw}`;
+  const { token, expiresAt } = await createPasswordResetToken(user.email, 30);
 
-  // send email via your existing lib
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin).replace(/\/$/, "");
+  const link = `${base}/reset-password?token=${token}`;
+
+  const html = `
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5;color:#0f172a">
+      <h2 style="margin:0 0 12px">Reset your password</h2>
+      <p style="margin:0 0 12px">Click the button below to set a new password. This link expires at <strong>${expiresAt.toISOString()}</strong>.</p>
+      <p><a href="${link}" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#ea580c;color:#fff;text-decoration:none;font-weight:600">Reset password</a></p>
+      <p style="font-size:13px;color:#475569;margin-top:16px">If you didn’t request this, you can ignore this email.</p>
+    </div>
+  `;
+
   try {
-    await sendEmail(
-      email,
-      "Reset your password",
-      `<p>Click the link below to reset your password. This link expires at ${expiresAt.toISOString()}.</p>
-       <p><a href="${link}">${link}</a></p>`
-    );
+    await sendEmail(user.email, "Reset your password", html);
   } catch (e) {
-    // Still return ok (don’t leak), but log for ops
+    // Don't leak delivery errors to the client
     console.error("sendEmail error:", e);
   }
 
