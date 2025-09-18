@@ -1,103 +1,65 @@
-import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
+import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
-// Local Prisma (do NOT export from a route file)
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
-let prisma: PrismaClient;
-if (process.env.NODE_ENV === "production") {
-  prisma = new PrismaClient();
-} else {
-  prisma = globalForPrisma.prisma ?? new PrismaClient();
-  globalForPrisma.prisma = prisma;
-}
+const prisma = new PrismaClient();
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-// Utilities
-function bad(status: number, msg: string) {
-  return NextResponse.json({ ok: false, error: msg }, { status });
-}
-
-// Try a few realistic table/column combos (Postgres)
-async function upsertPasswordRaw(
-  email: string,
-  hashed: string
-): Promise<{ ok: boolean; used?: { table: string; column: string } }> {
-  // candidates: [table, column]
-  const candidates: Array<[string, string]> = [
-    [`"User"`, `"passwordHash"`], // Prisma default model User with passwordHash
-    [`"User"`, `"password"`],     // model User with "password"
-    [`"users"`, `"passwordHash"`],// snake plural
-    [`"users"`, `"password"`],
-    [`users`, `passwordHash`],
-    [`users`, `password`],
-  ];
-
-  for (const [table, column] of candidates) {
-    const sql =
-      `INSERT INTO ${table} ("email", ${column}) ` +
-      `VALUES ($1, $2) ` +
-      `ON CONFLICT ("email") DO UPDATE SET ${column} = EXCLUDED.${column}`;
-
-    try {
-      await prisma.$executeRawUnsafe(sql, email, hashed);
-      return { ok: true, used: { table, column } };
-    } catch (e) {
-      // Try the next candidate
-      continue;
-    }
-  }
-
-  return { ok: false };
-}
-
-async function handler(req: Request) {
+// Accept GET so you can call it from the browser.
+export async function GET(req: NextRequest) {
   try {
-    // Accept GET (query) and POST (JSON)
-    let token = "";
-    let email = "";
-    let password = "";
-
-    if (req.method === "POST") {
-      const body = (await req.json().catch(() => ({}))) as any;
-      token = String(body.token ?? "");
-      email = String(body.email ?? "").trim().toLowerCase();
-      password = String(body.password ?? "");
-    } else {
-      const sp = new URL(req.url).searchParams;
-      token = sp.get("token") ?? "";
-      email = (sp.get("email") ?? "").trim().toLowerCase();
-      password = sp.get("password") ?? "";
-    }
+    const { searchParams } = new URL(req.url);
+    const token = searchParams.get("token") ?? "";
+    const email = searchParams.get("email") ?? "";
+    const password = searchParams.get("password") ?? "";
 
     const expected = process.env.DEBUG_ADMIN_TOKEN || "monikkedetsnarterfærdigt";
     if (!token || token !== expected) {
-      return bad(401, "unauthorized");
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
     if (!email || !password) {
-      return bad(400, "missing email or password");
+      return NextResponse.json({ ok: false, error: "missing_email_or_password" }, { status: 400 });
     }
 
-    const hashed = await bcrypt.hash(password, 10);
-
-    // First try pure SQL upsert with common table/column names
-    const r = await upsertPasswordRaw(email, hashed);
-    if (r.ok) {
-      return NextResponse.json({ ok: true, method: "raw", used: r.used });
+    // Make sure the user exists
+    const user = await prisma.user.findUnique({ where: { email }, select: { id: true, email: true } });
+    if (!user) {
+      return NextResponse.json({ ok: false, error: "user_not_found" }, { status: 404 });
     }
 
-    // If all raw patterns failed, give a clearer error
-    console.error(
-      "debug-set-password: could not find a matching table/column for password. " +
-        "Please align the route with your Prisma schema."
+    // Find a password column on "public"."User" (case-insensitive)
+    const candidates = ["passwordhash", "password_hash", "password"];
+    const cols = (await prisma.$queryRaw<
+      { column_name: string }[]
+    >`SELECT column_name
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND lower(table_name) = 'user'`) || [];
+
+    const match = cols.find(c => candidates.includes(c.column_name.toLowerCase()));
+    if (!match) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "no_matching_password_column",
+          columns_seen: cols.map(c => c.column_name),
+        },
+        { status: 400 }
+      );
+    }
+
+    const passwordColumn = match.column_name; // e.g. "passwordHash"
+    const hash = await bcrypt.hash(password, 12);
+
+    // Update using raw SQL: parameterise values, inject only the column name
+    await prisma.$executeRawUnsafe(
+      `UPDATE "public"."User" SET "${passwordColumn}" = $1 WHERE email = $2`,
+      hash,
+      email
     );
-    return bad(500, "no_matching_password_column");
+
+    return NextResponse.json({ ok: true, column: passwordColumn });
   } catch (err) {
     console.error("debug-set-password error:", err);
-    return bad(500, "server_error");
+    return NextResponse.json({ ok: false, error: "server_error" }, { status: 500 });
   }
 }
-
-export { handler as GET, handler as POST };
