@@ -26,27 +26,28 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await hashPassword(password);
 
-    // Upsert WITHOUT emailVerified (your schema doesn't have it)
+    // Upsert user (your schema doesn't have emailVerified — keep it simple)
     await prisma.user.upsert({
       where: { email },
       update: { passwordHash },
       create: { email, passwordHash },
-      select: { id: true }, // just to keep the call typed
+      select: { id: true },
     });
 
-    // Build verification link (informational – no DB flag toggled)
+    // Build verify link
     const token = await makeVerifyToken(email);
     const verifyUrl = `${baseUrl(req)}/api/auth/verify?token=${encodeURIComponent(
       token
     )}`;
 
+    // Send the email — if Resend rejects, we surface the exact error
     await sendEmail({
       to: email,
       subject: "Verify your email — SnoutMarkets",
       html: `
         <div style="font-family:system-ui;line-height:1.6">
           <p>Hi,</p>
-          <p>Click the button below to confirm this email belongs to you.</p>
+          <p>Click the button below to confirm your email.</p>
           <p><a href="${verifyUrl}" style="background:#f05a0e;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;display:inline-block">Verify my email</a></p>
           <p>Or paste this link into your browser:<br>${verifyUrl}</p>
         </div>
