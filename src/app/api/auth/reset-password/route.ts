@@ -1,6 +1,7 @@
+// src/app/api/auth/reset-password/route.ts
 import { NextResponse } from "next/server";
 import { consumePasswordReset } from "@/lib/password-reset";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/passwords";
 
 export async function POST(req: Request) {
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
 
   await prisma.user.update({
     where: { id: res.userId },
-    data: { password: passwordHash },
+    data: { passwordHash }, // <-- correct column in your schema
   });
 
   return NextResponse.json({ ok: true });
