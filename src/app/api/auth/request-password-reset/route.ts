@@ -1,12 +1,14 @@
+// src/app/api/auth/request-password-reset/route.ts
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db";
 import { createPasswordReset } from "@/lib/password-reset";
+import { sendEmail } from "@/lib/email";
 
-const APP_URL = process.env.APP_URL ?? "http://localhost:3000"; // set in env
+const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 5;
 
-// very simple memory RL (replace with redis if you have it)
+// very simple in-memory rate limiter (use redis in prod)
 const rl = new Map<string, { count: number; ts: number }>();
 
 function rateLimited(key: string) {
@@ -29,22 +31,31 @@ export async function POST(req: Request) {
 
   const key = `r:${email}`;
   if (rateLimited(key)) {
-    // Always respond 200 to avoid user enumeration
+    // Always 200 to avoid user enumeration
     return NextResponse.json({ ok: true });
   }
 
-  const user = await prisma.user.findUnique({ where: { email } });
-
-  // Always respond success to avoid leaking which emails exist.
-  if (!user) return NextResponse.json({ ok: true });
+  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+  if (!user) {
+    // Always 200 to avoid leaking which emails exist
+    return NextResponse.json({ ok: true });
+  }
 
   const { raw, expiresAt } = await createPasswordReset(user.id, 30);
   const link = `${APP_URL}/reset-password?token=${raw}`;
 
-  // TODO: replace with your mailer
-  // await sendMail({ to: email, subject: "Reset your password", text: `Reset link: ${link}` });
-
-  console.log("[DEV] Password reset link:", link, "expires", expiresAt.toISOString());
+  // send email via your existing lib
+  try {
+    await sendEmail(
+      email,
+      "Reset your password",
+      `<p>Click the link below to reset your password. This link expires at ${expiresAt.toISOString()}.</p>
+       <p><a href="${link}">${link}</a></p>`
+    );
+  } catch (e) {
+    // Still return ok (don’t leak), but log for ops
+    console.error("sendEmail error:", e);
+  }
 
   return NextResponse.json({ ok: true });
 }
