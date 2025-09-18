@@ -1,11 +1,12 @@
-// src/app/api/auth/callback/route.ts
+// src/app/api/auth/callback/route.ts  (replace entire file)
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createSession } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const token = req.nextUrl.searchParams.get("token");
-  if (!token) {
+  const token = req.nextUrl.searchParams.get("token") || "";
+  // Only accept login tokens
+  if (!token.startsWith("ml_")) {
     return NextResponse.redirect(new URL("/login?error=invalid", req.url));
   }
 
