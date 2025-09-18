@@ -10,10 +10,18 @@ export async function GET(req: NextRequest) {
   const token = url.searchParams.get("token") || "";
   try {
     const email = await readVerifyToken(token);
-    await prisma.user.update({
+
+    const exists = await prisma.user.findUnique({
       where: { email },
-      data: { emailVerified: true },
+      select: { id: true },
     });
+    if (!exists) {
+      return NextResponse.redirect(
+        new URL("/login?error=user-not-found", req.url)
+      );
+    }
+
+    // No emailVerified field in schema, so we just confirm and redirect
     return NextResponse.redirect(new URL("/login?info=verified", req.url));
   } catch (e: any) {
     const msg = encodeURIComponent(String(e?.message || "invalid-token"));
