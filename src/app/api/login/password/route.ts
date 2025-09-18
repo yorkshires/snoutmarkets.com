@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { signSession, COOKIE_NAME } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -18,18 +19,15 @@ export async function POST(req: Request) {
     let userId: string | null = null;
     let hash: string | null = null;
 
-    // Try via Prisma first (now that passwordHash exists in the schema)
     const prismaUser = await prisma.user.findUnique({
       where: { email },
       select: { id: true, passwordHash: true },
     });
-
     if (prismaUser) {
       userId = prismaUser.id;
       hash = prismaUser.passwordHash ?? null;
     }
 
-    // Fallback to a raw query in case the ORM path doesn’t return a hash
     if (!hash) {
       const rows = await prisma.$queryRawUnsafe<
         { id: string; passwordhash: string | null }[]
@@ -47,24 +45,27 @@ export async function POST(req: Request) {
       }
     }
 
-    // No hash on record -> invalid credentials
     if (!hash) {
       return NextResponse.json({ ok: false }, { status: 401 });
     }
 
-    // Compare supplied password against stored hash
     const ok = await bcrypt.compare(password, hash);
     if (!ok) {
       return NextResponse.json({ ok: false }, { status: 401 });
     }
 
-    // ✅ Password correct — set your session here if you have a helper
-    // await createSession(userId!)
-    // return NextResponse.redirect(new URL("/", req.url), { status: 303 })
-
-    return NextResponse.json({ ok: true, userId });
+    // ✅ Issue session + redirect
+    const token = await signSession(userId!);
+    const res = NextResponse.redirect(new URL("/", req.url), { status: 303 });
+    res.cookies.set(COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+    return res;
   } catch {
-    // Avoid leaking details
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 }
