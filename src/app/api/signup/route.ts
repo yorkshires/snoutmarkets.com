@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
-import { hashPassword } from "@/lib/password";
+import { hashPassword } from "@/lib/passwords";
 import { randomBytes } from "crypto";
 import { sendEmail } from "@/lib/email";
 
