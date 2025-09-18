@@ -2,46 +2,35 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 
-export function generateRawToken(bytes = 32) {
-  return crypto.randomBytes(bytes).toString("hex"); // send this by email
+function randomHex(bytes = 32) {
+  return crypto.randomBytes(bytes).toString("hex");
 }
 
-export function sha256(input: string) {
-  return crypto.createHash("sha256").update(input, "utf8").digest("hex");
-}
-
-// Create a reset record; returns the raw token to email
-export async function createPasswordReset(userId: string, ttlMinutes = 30) {
-  const raw = generateRawToken();
-  const tokenHash = sha256(raw);
+export async function createPasswordResetToken(email: string, ttlMinutes = 30) {
+  const token = `pr_${randomHex(32)}`;
   const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);
 
-  // Invalidate old pending tokens
-  await prisma.passwordReset.updateMany({
-    where: { userId, usedAt: null, expiresAt: { gt: new Date() } },
-    data: { expiresAt: new Date() },
+  // Store in MagicLink table (re-using it for reset purpose)
+  await prisma.magicLink.create({
+    data: { token, email: email.toLowerCase().trim(), expiresAt },
   });
 
-  await prisma.passwordReset.create({
-    data: { userId, tokenHash, expiresAt },
-  });
-
-  return { raw, expiresAt };
+  return { token, expiresAt };
 }
 
-export async function consumePasswordReset(rawToken: string) {
-  const tokenHash = sha256(rawToken);
+// Validate + consume a password reset token
+export async function consumePasswordResetToken(token: string) {
+  if (!token.startsWith("pr_")) return { ok: false as const, reason: "invalid" };
 
-  const pr = await prisma.passwordReset.findUnique({ where: { tokenHash } });
-  if (!pr) return { ok: false as const, reason: "invalid" };
-  if (pr.usedAt) return { ok: false as const, reason: "used" };
-  if (pr.expiresAt < new Date()) return { ok: false as const, reason: "expired" };
+  const rec = await prisma.magicLink.findUnique({ where: { token } });
+  if (!rec) return { ok: false as const, reason: "invalid" };
+  if (rec.usedAt) return { ok: false as const, reason: "used" };
+  if (rec.expiresAt < new Date()) return { ok: false as const, reason: "expired" };
 
-  // mark used
-  await prisma.passwordReset.update({
-    where: { tokenHash },
+  await prisma.magicLink.update({
+    where: { token },
     data: { usedAt: new Date() },
   });
 
-  return { ok: true as const, userId: pr.userId };
+  return { ok: true as const, email: rec.email };
 }
