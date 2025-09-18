@@ -1,63 +1,51 @@
-// src/app/api/debug-set-password/route.ts
-export const runtime = "nodejs";
+import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { hashPassword } from "@/lib/password";
+export const runtime = "nodejs";        // ensure Node runtime
+export const dynamic = "force-dynamic"; // no caching
 
-// Use env when present, otherwise fall back to your provided token.
-const EXPECTED_TOKEN =
-  process.env.DEBUG_ADMIN_TOKEN || "monikkedetsnarterfærdigt";
-
-export async function POST(req: NextRequest) {
+async function handler(req: Request) {
   try {
-    const token = req.headers.get("x-debug-token");
-    if (!token || token !== EXPECTED_TOKEN) {
-      return NextResponse.json(
-        { ok: false, error: "unauthorized" },
-        { status: 401 }
-      );
+    // Accept both GET (query params) and POST (JSON body)
+    let email = "";
+    let password = "";
+    let token = "";
+
+    if (req.method === "POST") {
+      const body = await req.json().catch(() => ({} as any));
+      token = body.token || "";
+      email = (body.email || "").trim().toLowerCase();
+      password = body.password || "";
+    } else {
+      const { searchParams } = new URL(req.url);
+      token = searchParams.get("token") || "";
+      email = (searchParams.get("email") || "").trim().toLowerCase();
+      password = searchParams.get("password") || "";
     }
 
-    const form = await req.formData();
-    const email = String(form.get("email") || "").toLowerCase().trim();
-    const password = String(form.get("password") || "");
-    const verify = String(form.get("verify") || "") === "1";
-
+    const expected = process.env.DEBUG_ADMIN_TOKEN || "monikkedetsnarterfærdigt";
+    if (!token || token !== expected) {
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
     if (!email || !password) {
-      return NextResponse.json(
-        { ok: false, error: "email and password required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "missing email or password" }, { status: 400 });
     }
 
-    const passwordHash = await hashPassword(password);
+    const passwordHash = await bcrypt.hash(password, 10);
 
-    // Build update/create data. `any` lets us add emailVerifiedAt when needed.
-    const data: any = { passwordHash };
-    if (verify) data.emailVerifiedAt = new Date();
-
-    await prisma.user.upsert({
+    const user = await prisma.user.upsert({
       where: { email },
-      update: data,
-      create: { email, ...data },
-    });
-
-    // Fetch a minimal, always-safe shape
-    const user = await prisma.user.findUnique({
-      where: { email },
+      update: { passwordHash },
+      create: { email, passwordHash },
       select: { id: true, email: true },
     });
 
-    return NextResponse.json({
-      ok: true,
-      user,
-      verifyApplied: verify,
-    });
-  } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: String(e?.message || e) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: true, user });
+  } catch (err) {
+    console.error("debug-set-password error", err);
+    return NextResponse.json({ ok: false, error: "server_error" }, { status: 500 });
   }
 }
+
+export { handler as GET, handler as POST };
