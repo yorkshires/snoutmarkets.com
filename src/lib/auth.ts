@@ -2,13 +2,18 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
+import { prisma } from "@/lib/db";
 
 export const SESSION_COOKIE = "snout_session";
 
 function secretKey() {
-  const raw = process.env.AUTH_SECRET || process.env.JWT_SECRET;
+  // Support any of these env names to avoid breakage
+  const raw =
+    process.env.AUTH_SECRET ||
+    process.env.JWT_SECRET ||
+    process.env.SESSION_SECRET;
   if (!raw) {
-    throw new Error("AUTH_SECRET (or JWT_SECRET) is not set");
+    throw new Error("AUTH_SECRET / JWT_SECRET / SESSION_SECRET is not set");
   }
   return new TextEncoder().encode(raw);
 }
@@ -18,7 +23,10 @@ function secretKey() {
  * Works in Route Handlers (with or without a NextResponse).
  * Returns the token so callers can use it if needed.
  */
-export async function createSession(userId: string, res?: NextResponse): Promise<string> {
+export async function createSession(
+  userId: string,
+  res?: NextResponse
+): Promise<string> {
   const token = await new SignJWT({ uid: userId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -31,16 +39,16 @@ export async function createSession(userId: string, res?: NextResponse): Promise
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 24 * 30, // 30 days
+    domain: process.env.COOKIE_DOMAIN || undefined,
   };
 
   if (res) {
     res.cookies.set(SESSION_COOKIE, token, cookieOpts);
   } else {
-    // In a route handler without an explicit NextResponse
     try {
       cookies().set(SESSION_COOKIE, token, cookieOpts);
     } catch {
-      // ignore if not in a context that supports cookies()
+      // ignore if not in a cookies() context
     }
   }
   return token;
@@ -58,21 +66,31 @@ export async function getSessionUserId(): Promise<string | null> {
   }
 }
 
-/** Convenience: return a minimal user object or null. */
-export async function getSessionUser(): Promise<{ id: string } | null> {
+/** Return `{ id, email }` of the logged-in user, or `null` if no session. */
+export async function getSessionUser(): Promise<{ id: string; email: string } | null> {
   const uid = await getSessionUserId();
-  return uid ? { id: uid } : null;
+  if (!uid) return null;
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: uid },
+      select: { id: true, email: true },
+    });
+    return user ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Clear the session cookie (works with or without a NextResponse). */
 export function clearSession(res?: NextResponse) {
+  const opts = { path: "/", domain: process.env.COOKIE_DOMAIN || undefined };
   if (res) {
-    res.cookies.delete(SESSION_COOKIE);
+    res.cookies.set(SESSION_COOKIE, "", { ...opts, maxAge: 0 });
   } else {
     try {
-      cookies().delete(SESSION_COOKIE);
+      cookies().set(SESSION_COOKIE, "", { ...opts, maxAge: 0 });
     } catch {
-      // ignore if not in a context that supports cookies()
+      // ignore if not in a cookies() context
     }
   }
 }
