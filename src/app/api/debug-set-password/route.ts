@@ -1,27 +1,36 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { PrismaClient } from "@prisma/client";
 
-export const runtime = "nodejs";        // ensure Node runtime
-export const dynamic = "force-dynamic"; // no caching
+// Safe, singleton Prisma in dev; fresh in prod
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    // log: ["query", "error", "warn"], // enable if you need it
+  });
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 async function handler(req: Request) {
   try {
-    // Accept both GET (query params) and POST (JSON body)
+    // Accept both GET (query) and POST (JSON)
     let email = "";
     let password = "";
     let token = "";
 
     if (req.method === "POST") {
       const body = await req.json().catch(() => ({} as any));
-      token = body.token || "";
-      email = (body.email || "").trim().toLowerCase();
-      password = body.password || "";
+      token = (body.token ?? "").toString();
+      email = (body.email ?? "").toString().trim().toLowerCase();
+      password = (body.password ?? "").toString();
     } else {
-      const { searchParams } = new URL(req.url);
-      token = searchParams.get("token") || "";
-      email = (searchParams.get("email") || "").trim().toLowerCase();
-      password = searchParams.get("password") || "";
+      const sp = new URL(req.url).searchParams;
+      token = sp.get("token") ?? "";
+      email = (sp.get("email") ?? "").trim().toLowerCase();
+      password = sp.get("password") ?? "";
     }
 
     const expected = process.env.DEBUG_ADMIN_TOKEN || "monikkedetsnarterfærdigt";
@@ -32,6 +41,8 @@ async function handler(req: Request) {
       return NextResponse.json({ ok: false, error: "missing email or password" }, { status: 400 });
     }
 
+    // If your schema uses `password` instead of `passwordHash`,
+    // change the field name below to match your Prisma model.
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.upsert({
