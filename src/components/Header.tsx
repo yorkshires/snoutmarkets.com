@@ -2,18 +2,24 @@
 import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
 
-export const dynamic = "force-dynamic"; // ensure it reads cookies on every request
+export const dynamic = "force-dynamic";
 
 export default async function Header() {
   const user = await getSessionUser();
 
   return (
     <header className="flex items-center justify-between px-4 py-3">
-      <Link href="/" className="text-xl font-semibold">SnoutMarkets</Link>
+      <Link href="/" className="text-xl font-semibold">
+        SnoutMarkets
+      </Link>
 
       <nav className="flex items-center gap-3">
-        <Link href="/sell" className="px-3 py-1 rounded border">Sell</Link>
-        <Link href="/account/listings" className="px-3 py-1 rounded border">My listings</Link>
+        <Link href="/sell" className="px-3 py-1 rounded border">
+          Sell
+        </Link>
+        <Link href="/account/listings" className="px-3 py-1 rounded border">
+          My listings
+        </Link>
 
         {user ? (
           <form action="/api/logout" method="post">
