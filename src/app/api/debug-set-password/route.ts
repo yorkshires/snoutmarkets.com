@@ -2,24 +2,27 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 
-// Safe, singleton Prisma in dev; fresh in prod
+// --- Prisma client (no exports here) ---
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    // log: ["query", "error", "warn"], // enable if you need it
-  });
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
+let prisma: PrismaClient;
+if (process.env.NODE_ENV === "production") {
+  prisma = new PrismaClient();
+} else {
+  prisma = globalForPrisma.prisma ?? new PrismaClient();
+  globalForPrisma.prisma = prisma;
+}
+
+// Route config
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Handles both GET (query string) and POST (JSON)
 async function handler(req: Request) {
   try {
-    // Accept both GET (query) and POST (JSON)
+    let token = "";
     let email = "";
     let password = "";
-    let token = "";
 
     if (req.method === "POST") {
       const body = await req.json().catch(() => ({} as any));
@@ -41,8 +44,8 @@ async function handler(req: Request) {
       return NextResponse.json({ ok: false, error: "missing email or password" }, { status: 400 });
     }
 
-    // If your schema uses `password` instead of `passwordHash`,
-    // change the field name below to match your Prisma model.
+    // If your Prisma model uses `password` instead of `passwordHash`,
+    // change these two fields below to match your schema.
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.upsert({
