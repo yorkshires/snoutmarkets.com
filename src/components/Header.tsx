@@ -14,7 +14,7 @@ export default async function Header() {
 
       <nav className="flex items-center gap-3">
         <Link href="/sell" className="rounded-full border px-4 py-2">Sell</Link>
-        <Link href="/my-listings" className="rounded-full border px-4 py-2">My listings</Link>
+        <Link href="/account/listings" className="rounded-full border px-4 py-2">My listings</Link>
 
         {!loggedIn ? (
           <Link href="/login" className="rounded-full bg-orange-500 px-4 py-2 text-white">
