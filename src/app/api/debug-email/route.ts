@@ -1,4 +1,3 @@
-// src/app/api/debug-email/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { sendEmail } from "@/lib/mailer";
 
@@ -14,9 +13,6 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json({ ok: true, data });
   } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: String(e?.message || e) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
 }
