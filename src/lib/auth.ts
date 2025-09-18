@@ -2,6 +2,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
+import { prisma } from "@/lib/db";
 
 export const SESSION_COOKIE = "snout_session";
 
@@ -42,6 +43,21 @@ export async function getSessionUserId(): Promise<string | null> {
     if (!token) return null;
     const { payload } = await jwtVerify(token, secretKey());
     return (payload as SessionPayload).uid ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Kept for Header.tsx — returns { id, email } or null */
+export async function getSessionUser(): Promise<{ id: string; email: string } | null> {
+  const uid = await getSessionUserId();
+  if (!uid) return null;
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: uid },
+      select: { id: true, email: true },
+    });
+    return user ?? null;
   } catch {
     return null;
   }
