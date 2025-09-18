@@ -9,3 +9,10 @@ export async function POST(req: NextRequest) {
   clearSession(res);
   return res;
 }
+
+// (Optional) allow GET so clicking a link also logs out in case the form changes
+export async function GET(req: NextRequest) {
+  const res = NextResponse.redirect(new URL("/", req.url));
+  clearSession(res);
+  return res;
+}
