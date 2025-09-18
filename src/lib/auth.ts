@@ -4,14 +4,14 @@ import { NextResponse } from "next/server";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { prisma } from "@/lib/db";
 
-export const SESSION_COOKIE = "snout_session";
+export const SESSION_COOKIE = "sm_sess"; // <<< unified cookie name
 
 function secretKey() {
   const raw =
-    process.env.AUTH_SECRET ||
+    process.env.SESSION_SECRET ||
     process.env.JWT_SECRET ||
-    process.env.SESSION_SECRET;
-  if (!raw) throw new Error("Set AUTH_SECRET/JWT_SECRET/SESSION_SECRET");
+    process.env.AUTH_SECRET;
+  if (!raw) throw new Error("SESSION_SECRET/JWT_SECRET/AUTH_SECRET is missing");
   return new TextEncoder().encode(raw);
 }
 
@@ -20,16 +20,10 @@ type SessionPayload = JWTPayload & { uid: string };
 function cookieDomainForCurrentHost(): string | undefined {
   const want = (process.env.COOKIE_DOMAIN || "").toLowerCase();
   if (!want) return undefined;
-
-  // Current request host (works in RSC/route handlers)
   const h = headers().get("host")?.toLowerCase();
   if (!h) return undefined;
-
-  // Only set an explicit domain when the current host ends with it (prod).
-  if (h === want || h.endsWith(`.${want}`)) return want;
-
-  // On preview / localhost, don't set a domain (let browser default).
-  return undefined;
+  if (h === want || h.endsWith(`.${want}`)) return want; // prod
+  return undefined; // preview/local
 }
 
 export async function createSession(userId: string, res?: NextResponse) {
