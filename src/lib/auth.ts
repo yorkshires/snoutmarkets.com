@@ -72,11 +72,23 @@ export async function getSessionUser(): Promise<{ id: string; email: string } | 
 }
 
 export function clearSession(res?: NextResponse) {
-  const opts = {
+  const domain = cookieDomainForCurrentHost();
+  const base = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
     path: "/",
+    expires: new Date(0),
     maxAge: 0,
-    domain: cookieDomainForCurrentHost(),
   };
-  if (res) res.cookies.set(SESSION_COOKIE, "", opts);
-  else cookies().set(SESSION_COOKIE, "", opts);
+
+  const set = (r: NextResponse | undefined, withDomain: boolean) => {
+    const opts = withDomain && domain ? { ...base, domain } : base;
+    if (r) r.cookies.set(SESSION_COOKIE, "", opts);
+    else cookies().set(SESSION_COOKIE, "", opts);
+  };
+
+  // Delete both: with domain (prod) and without (preview/local)
+  set(res, true);
+  set(res, false);
 }
