@@ -1,51 +1,36 @@
 // src/components/Header.tsx
 import Link from "next/link";
-import Image from "next/image";
-import { getSessionUserId } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
+
+export const dynamic = "force-dynamic"; // ensure it reads cookies on every request
 
 export default async function Header() {
-  const userId = await getSessionUserId();
-  const isAuthed = !!userId;
+  const user = await getSessionUser();
 
   return (
-    <header className="w-full bg-white border-b">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <Image
-            src="/publiclogo.png"
-            alt="SnoutMarkets"
-            width={28}
-            height={28}
-            className="rounded"
-            priority
-          />
-          <span className="text-2xl font-semibold tracking-tight text-slate-900">
-            SnoutMarkets
-          </span>
-        </Link>
+    <header className="flex items-center justify-between px-4 py-3">
+      <Link href="/" className="text-xl font-semibold">SnoutMarkets</Link>
 
-        <nav className="flex items-center gap-3">
-          {isAuthed && (
-            <Link href="/account/listings" className="text-sm text-slate-700 hover:underline">
-              My listings
-            </Link>
-          )}
-          {isAuthed ? (
-            <form action="/logout" method="post">
-              <button
-                type="submit"
-                className="rounded-xl bg-orange-600 text-white px-4 py-2 text-sm"
-              >
-                Log out
-              </button>
-            </form>
-          ) : (
-            <Link href="/login" className="rounded-xl bg-orange-600 text-white px-4 py-2 text-sm">
-              Log in
-            </Link>
-          )}
-        </nav>
-      </div>
+      <nav className="flex items-center gap-3">
+        <Link href="/sell" className="px-3 py-1 rounded border">Sell</Link>
+        <Link href="/account/listings" className="px-3 py-1 rounded border">My listings</Link>
+
+        {user ? (
+          <form action="/api/logout" method="post">
+            <span className="mr-2 text-sm text-gray-600">{user.email}</span>
+            <button
+              type="submit"
+              className="px-3 py-1 rounded bg-orange-600 text-white"
+            >
+              Log out
+            </button>
+          </form>
+        ) : (
+          <Link href="/login" className="px-3 py-1 rounded bg-orange-600 text-white">
+            Log in
+          </Link>
+        )}
+      </nav>
     </header>
   );
 }
