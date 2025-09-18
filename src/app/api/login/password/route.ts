@@ -15,33 +15,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false }, { status: 400 });
     }
 
-    //
-    // Try to fetch the password hash via Prisma first. If your Prisma
-    // model doesn't expose `passwordHash` yet, we'll fall back to raw SQL.
-    //
     let userId: string | null = null;
     let hash: string | null = null;
 
-    try {
-      // NOTE: casting `select` as any to avoid TS errors if your Prisma
-      // model hasn't been regenerated with the `passwordHash` field yet.
-      const prismaUser = (await prisma.user.findUnique({
-        where: { email },
-        // @ts-expect-error - tolerate until schema is regenerated
-        select: { id: true, passwordHash: true } as any,
-      })) as any;
+    // Try via Prisma first (now that passwordHash exists in the schema)
+    const prismaUser = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, passwordHash: true },
+    });
 
-      if (prismaUser) {
-        userId = prismaUser.id ?? null;
-        hash = prismaUser.passwordHash ?? null;
-      }
-    } catch {
-      // ignore and fall back to raw query below
+    if (prismaUser) {
+      userId = prismaUser.id;
+      hash = prismaUser.passwordHash ?? null;
     }
 
-    //
-    // Fallback: fetch the hash directly from the table with a raw query.
-    //
+    // Fallback to a raw query in case the ORM path doesn’t return a hash
     if (!hash) {
       const rows = await prisma.$queryRawUnsafe<
         { id: string; passwordhash: string | null }[]
@@ -59,7 +47,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // No hash on record -> behave like invalid credentials
+    // No hash on record -> invalid credentials
     if (!hash) {
       return NextResponse.json({ ok: false }, { status: 401 });
     }
@@ -70,10 +58,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false }, { status: 401 });
     }
 
-    // ✅ PASSWORD IS CORRECT — set your session here (if you have a helper).
-    // Example placeholder:
-    // await createSession(userId!);
-    // return NextResponse.redirect(new URL("/", req.url), { status: 303 });
+    // ✅ Password correct — set your session here if you have a helper
+    // await createSession(userId!)
+    // return NextResponse.redirect(new URL("/", req.url), { status: 303 })
 
     return NextResponse.json({ ok: true, userId });
   } catch {
