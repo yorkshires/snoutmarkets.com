@@ -1,71 +1,41 @@
 // src/app/api/login/password/route.ts
-import { NextResponse } from "next/server";
+export const runtime = "nodejs";
+
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import bcrypt from "bcryptjs";
-import { signSession, COOKIE_NAME } from "@/lib/session";
+import { createSession } from "@/lib/auth";
+import { verifyPassword } from "@/lib/passwords";
 
-export const dynamic = "force-dynamic";
-
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
-    const email = String(form.get("email") ?? "").trim().toLowerCase();
-    const password = String(form.get("password") ?? "");
+    const email = String(form.get("email") || "").toLowerCase().trim();
+    const password = String(form.get("password") || "");
 
     if (!email || !password) {
-      return NextResponse.json({ ok: false }, { status: 400 });
+      return NextResponse.redirect(new URL("/login?error=invalid", req.url));
     }
 
-    let userId: string | null = null;
-    let hash: string | null = null;
-
-    const prismaUser = await prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email },
       select: { id: true, passwordHash: true },
     });
-    if (prismaUser) {
-      userId = prismaUser.id;
-      hash = prismaUser.passwordHash ?? null;
+
+    if (!user || !user.passwordHash) {
+      return NextResponse.redirect(new URL("/login?error=badcreds", req.url));
     }
 
-    if (!hash) {
-      const rows = await prisma.$queryRawUnsafe<
-        { id: string; passwordhash: string | null }[]
-      >(
-        `SELECT id, "passwordHash" AS passwordhash
-           FROM "public"."User"
-          WHERE email = $1
-          LIMIT 1`,
-        email
-      );
-
-      if (rows?.length) {
-        userId = rows[0].id ?? null;
-        hash = rows[0].passwordhash ?? null;
-      }
-    }
-
-    if (!hash) {
-      return NextResponse.json({ ok: false }, { status: 401 });
-    }
-
-    const ok = await bcrypt.compare(password, hash);
+    // <-- supports bcrypt (60 chars) and argon2 (~160 chars)
+    const ok = await verifyPassword(password, user.passwordHash);
     if (!ok) {
-      return NextResponse.json({ ok: false }, { status: 401 });
+      return NextResponse.redirect(new URL("/login?error=badcreds", req.url));
     }
 
-    // ✅ Issue session + redirect
-    const token = await signSession(userId!);
-    const res = NextResponse.redirect(new URL("/", req.url), { status: 303 });
-    res.cookies.set(COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-    });
+    const res = NextResponse.redirect(new URL("/", req.url));
+    await createSession(user.id, res);
     return res;
-  } catch {
-    return NextResponse.json({ ok: false }, { status: 400 });
+  } catch (err) {
+    console.error("login/password error:", err);
+    return NextResponse.redirect(new URL("/login?error=server", req.url));
   }
 }
