@@ -151,15 +151,19 @@ export default function LoginPage() {
             <button type="submit" className="w-full rounded-2xl bg-orange-600 text-white px-4 py-3">
               Sign in
             </button>
-            <div className="pt-2">
-              <button
-                onClick={handleResend}
-                className="underline text-sm"
-                disabled={!email || resendStatus === "sending"}
-              >
-                {resendStatus === "sending" ? "Sending…" : "Resend verification"}
-              </button>
-            </div>
+       <div className="flex items-center justify-between mt-4">
+  <a href="/forgot-password" className="text-blue-700 hover:underline">
+    Forgot password?
+  </a>
+  <button
+    type="button"
+    onClick={handleResend}
+    className="underline text-sm"
+    disabled={!email || resendStatus === "sending"}
+  >
+    {resendStatus === "sending" ? "Sending…" : "Resend verification"}
+  </button>
+</div>
           </form>
         )}
 
