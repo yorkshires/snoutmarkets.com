@@ -69,6 +69,7 @@ export default function FilterBar() {
             Apply distance
           </button>
         </div>
+        <SloganBanner />
 
         <div className="rounded-xl border bg-white p-3 text-sm text-slate-700">
           <p className="font-medium mb-1">How the distance filter works</p>
@@ -107,7 +108,6 @@ export default function FilterBar() {
             </button>
           </div>
         </div>
-        <SloganBanner />
         <EuropeMap
           selected={country || undefined}
           onSelect={(cc) => {
