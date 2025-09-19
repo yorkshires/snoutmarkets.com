@@ -4,6 +4,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { COUNTRY_NAMES, CountryCode } from "@/lib/europe";
 import EuropeMap from "@/components/EuropeMap";
+import SloganBanner from "@/components/SloganBanner";
 import { useState, useMemo } from "react";
 
 const EU_CODES = Object.entries(COUNTRY_NAMES).map(([cc, name]) => ({
