@@ -107,6 +107,7 @@ export default function FilterBar() {
             </button>
           </div>
         </div>
+        <SloganBanner />
         <EuropeMap
           selected={country || undefined}
           onSelect={(cc) => {
