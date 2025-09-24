@@ -48,17 +48,15 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
     if (maxPrice != null) where.priceCents.lte = maxPrice;
   }
 
-  // Country filter (best-effort using the free-text 'location' field)
+   // Country filter using normalized seller profile country code
   if (countryCode) {
-    const name = (COUNTRY_NAMES as any)[countryCode] as string | undefined;
-    where.AND = [
-      {
-        OR: [
-          { location: { contains: countryCode, mode: "insensitive" } },
-          ...(name ? [{ location: { contains: name, mode: "insensitive" } }] : []),
-        ],
+    where.user = {
+      is: {
+        profile: {
+          is: { countryCode: countryCode },
+        },
       },
-    ];
+    };
   }
 
   const listings = await prisma.listing.findMany({
