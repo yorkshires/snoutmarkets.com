@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 
 async function ensureUserId(): Promise<string> {
   const c = cookies();
@@ -31,5 +32,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   }
 
   await prisma.listing.delete({ where: { id: ctx.params.id } });
+  revalidatePath("/");
+revalidatePath("/account/listings");
   return NextResponse.redirect(`${origin}/account/listings?deleted=1`);
 }
