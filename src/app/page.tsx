@@ -9,7 +9,7 @@ type SearchParams = {
   category?: string;
   min?: string;
   max?: string;
-  country?: string; // two-letter code, e.g. "DK"
+  country?: string; // two-letter code: DK, DE, etc.
 };
 
 function parsePrice(v?: string) {
@@ -30,9 +30,8 @@ export default async function Home({
     | CountryCode
     | "";
 
-  const where: any = {
-    status: "ACTIVE",
-  };
+  // Build a safe Prisma "where" without touching unknown relation paths.
+  const where: any = { status: "ACTIVE" };
 
   if (q) {
     where.OR = [
@@ -41,9 +40,7 @@ export default async function Home({
     ];
   }
 
-  if (category) {
-    where.category = category;
-  }
+  if (category) where.category = category;
 
   if (min !== undefined || max !== undefined) {
     where.price = {};
@@ -51,17 +48,7 @@ export default async function Home({
     if (max !== undefined) where.price.lte = max;
   }
 
-  // ✅ Robust country filter: use normalized seller profile countryCode (two-letter)
-  if (country) {
-    where.user = {
-      is: {
-        profile: {
-          is: { countryCode: country },
-        },
-      },
-    };
-  }
-
+  // Fetch first, including the seller's profile.countryCode.
   const listings = await prisma.listing.findMany({
     where,
     orderBy: { createdAt: "desc" },
@@ -75,17 +62,25 @@ export default async function Home({
     take: 60,
   });
 
+  // Filter by country in memory to avoid schema-specific Prisma paths.
+  const filtered =
+    country
+      ? listings.filter(
+          (l) => l.user?.profile?.countryCode?.toUpperCase() === country
+        )
+      : listings;
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 space-y-8">
       <FilterBar />
 
       <h2 className="text-2xl font-semibold">Latest listings</h2>
 
-      {listings.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="text-gray-600">No listings match your filters.</div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {listings.map((l) => (
+          {filtered.map((l) => (
             <ListingCard key={l.id} listing={l as any} />
           ))}
         </div>
