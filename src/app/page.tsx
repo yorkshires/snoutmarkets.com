@@ -6,10 +6,10 @@ import type { CountryCode } from "@/lib/europe";
 
 type SearchParams = {
   q?: string;
-  category?: string;
-  min?: string; // EUR as string, e.g. "10" or "10.50"
-  max?: string; // EUR as string
-  country?: string; // two-letter code, e.g. "DK"
+  category?: string; // slug/string stored in DB
+  min?: string;      // EUR string
+  max?: string;      // EUR string
+  country?: string;  // two-letter, e.g. "DK"
 };
 
 function toNumber(v?: string) {
@@ -17,23 +17,29 @@ function toNumber(v?: string) {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 function eurToCents(n?: number) {
-  return n === undefined ? undefined : Math.round(n * 100);
+  return n == null ? undefined : Math.round(n * 100);
 }
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function Home({ searchParams }: { searchParams: SearchParams }) {
   const q = (searchParams.q ?? "").trim();
-  const category = (searchParams.category ?? "").trim();
-  const minEUR = toNumber(searchParams.min);
-  const maxEUR = toNumber(searchParams.max);
-  const minCents = eurToCents(minEUR);
-  const maxCents = eurToCents(maxEUR);
-  const country = (searchParams.country ?? "").trim().toUpperCase() as
-    | CountryCode
-    | "";
+  const rawCategory = (searchParams.category ?? "").trim();
+  const minCents = eurToCents(toNumber(searchParams.min));
+  const maxCents = eurToCents(toNumber(searchParams.max));
+  const country = (searchParams.country ?? "").trim().toUpperCase() as CountryCode | "";
+
+  // Get the distinct categories that actually exist in the DB (ACTIVE only).
+  const distinctCats = await prisma.listing.findMany({
+    where: { status: "ACTIVE" },
+    distinct: ["category"],
+    select: { category: true },
+    orderBy: { category: "asc" },
+  });
+  const categories: string[] = distinctCats
+    .map((c) => c.category)
+    .filter((x): x is string => !!x);
+
+  // Only accept the category if it exists; otherwise ignore it.
+  const category = categories.includes(rawCategory) ? rawCategory : "";
 
   const where: any = { status: "ACTIVE" };
 
@@ -46,38 +52,30 @@ export default async function Home({
 
   if (category) where.category = category;
 
-  // ✅ Use priceCents (NOT price), and convert EUR ➜ cents
   if (minCents !== undefined || maxCents !== undefined) {
     where.priceCents = {};
     if (minCents !== undefined) where.priceCents.gte = minCents;
     if (maxCents !== undefined) where.priceCents.lte = maxCents;
   }
 
-  // Fetch listings; include seller profile countryCode for client display
   const listings = await prisma.listing.findMany({
     where,
     orderBy: { createdAt: "desc" },
     include: {
-      user: {
-        select: {
-          profile: { select: { countryCode: true } },
-        },
-      },
+      user: { select: { profile: { select: { countryCode: true } } } },
     },
     take: 60,
   });
 
-  // Optional country filter (robust across schema variations)
   const filtered =
     country
-      ? listings.filter(
-          (l) => l.user?.profile?.countryCode?.toUpperCase() === country
-        )
+      ? listings.filter((l) => l.user?.profile?.countryCode?.toUpperCase() === country)
       : listings;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 space-y-8">
-      <FilterBar />
+      {/* Pass the real categories down to the client filter bar */}
+      <FilterBar categories={categories} />
 
       <h2 className="text-2xl font-semibold">Latest listings</h2>
 
