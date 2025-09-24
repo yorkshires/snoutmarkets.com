@@ -2,7 +2,7 @@
 import { prisma } from "@/lib/db";
 import ListingCard from "@/components/ListingCard";
 import FilterBar from "@/components/FilterBar";
-import { COUNTRY_NAMES, CountryCode } from "@/lib/europe";
+import type { CountryCode } from "@/lib/europe";
 
 type SearchParams = {
   q?: string;
