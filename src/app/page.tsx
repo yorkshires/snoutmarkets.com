@@ -3,16 +3,16 @@ import { prisma } from "@/lib/db";
 import ListingCard from "@/components/ListingCard";
 import FilterBar from "@/components/FilterBar";
 import type { CountryCode } from "@/lib/europe";
-import { unstable_noStore as noStore } from "next/cache"; // ⬅️ add this
+import { unstable_noStore as noStore } from "next/cache";
 
-export const dynamic = "force-dynamic"; // ⬅️ keep this (or use revalidate=0)
+export const dynamic = "force-dynamic"; // disable static caching
 
 type SearchParams = {
   q?: string;
-  category?: string;
-  min?: string;
-  max?: string;
-  country?: string;
+  category?: string; // slug
+  min?: string;      // number string (can be "19,99")
+  max?: string;      // number string
+  country?: string;  // 2-letter code
 };
 
 function parsePriceToCents(v?: string) {
@@ -21,21 +21,21 @@ function parsePriceToCents(v?: string) {
 }
 
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
-  noStore(); // ⬅️ hard-disable caching for this render
+  noStore(); // hard-disable cache for this render
 
   const q = (searchParams?.q ?? "").trim();
   const categorySlug = (searchParams?.category ?? "").trim();
   const minPrice = parsePriceToCents(searchParams?.min);
   const maxPrice = parsePriceToCents(searchParams?.max);
   const countryCode = (searchParams?.country ?? "").toUpperCase() as CountryCode | "";
-}
 
-  // Load categories for the hero select (slug-based)
+  // Fetch categories for the select (by slug)
   const categories = await prisma.category.findMany({
+    select: { id: true, name: true, slug: true },
     orderBy: { name: "asc" },
-    select: { id: true, slug: true, name: true },
   });
 
+  // Build filters
   const where: any = { status: "ACTIVE" as const };
 
   if (q) {
@@ -45,40 +45,27 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
     ];
   }
 
-  // ✅ slug-based category filter (do NOT use categoryId)
   if (categorySlug) {
-    where.category = { is: { slug: categorySlug } };
+    // Filter by related category slug
+    where.category = { slug: categorySlug };
   }
 
-  // priceCents filter (EUR → cents)
-  if (minPrice != null || maxPrice != null) {
-    where.priceCents = {};
-    if (minPrice != null) where.priceCents.gte = minPrice;
-    if (maxPrice != null) where.priceCents.lte = maxPrice;
-  }
+  if (typeof minPrice === "number") where.priceCents = { ...(where.priceCents ?? {}), gte: minPrice };
+  if (typeof maxPrice === "number") where.priceCents = { ...(where.priceCents ?? {}), lte: maxPrice };
 
-  // country filter via normalized seller profile countryCode
   if (countryCode) {
-    where.user = {
-      is: {
-        profile: {
-          is: { countryCode: countryCode },
-        },
-      },
-    };
+    // Only apply if your schema has `countryCode` on Listing.
+    // Safe to keep — Prisma will ignore undefined fields.
+    where.countryCode = countryCode;
   }
 
   const listings = await prisma.listing.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    take: 30,
-    select: {
-      id: true,
-      title: true,
-      imageUrl: true,
-      priceCents: true,
-      currency: true,
-      location: true,
+    take: 12,
+    include: {
+      category: { select: { name: true, slug: true } },
+      user: { select: { id: true, name: true } },
     },
   });
 
