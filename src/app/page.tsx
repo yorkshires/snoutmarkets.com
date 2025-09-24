@@ -5,14 +5,14 @@ import FilterBar from "@/components/FilterBar";
 import type { CountryCode } from "@/lib/europe";
 import { unstable_noStore as noStore } from "next/cache";
 
-export const dynamic = "force-dynamic"; // disable static caching
+export const dynamic = "force-dynamic"; // always fetch fresh
 
 type SearchParams = {
   q?: string;
-  category?: string; // slug
-  min?: string;      // number string (can be "19,99")
-  max?: string;      // number string
-  country?: string;  // 2-letter code
+  category?: string; // category slug
+  min?: string;      // price string ("19.99" or "19,99")
+  max?: string;      // price string
+  country?: string;  // 2-letter seller country code
 };
 
 function parsePriceToCents(v?: string) {
@@ -21,7 +21,7 @@ function parsePriceToCents(v?: string) {
 }
 
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
-  noStore(); // hard-disable cache for this render
+  noStore(); // hard-disable any caching for this render
 
   const q = (searchParams?.q ?? "").trim();
   const categorySlug = (searchParams?.category ?? "").trim();
@@ -29,13 +29,13 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
   const maxPrice = parsePriceToCents(searchParams?.max);
   const countryCode = (searchParams?.country ?? "").toUpperCase() as CountryCode | "";
 
-  // Fetch categories for the select (by slug)
+  // For the category dropdown
   const categories = await prisma.category.findMany({
     select: { id: true, name: true, slug: true },
     orderBy: { name: "asc" },
   });
 
-  // Build filters
+  // ---- Build WHERE safely ----
   const where: any = { status: "ACTIVE" as const };
 
   if (q) {
@@ -46,17 +46,20 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
   }
 
   if (categorySlug) {
-    // Filter by related category slug
-    where.category = { slug: categorySlug };
+    // Correct way to filter by an optional to-one relation
+    where.category = { is: { slug: categorySlug } };
   }
 
-  if (typeof minPrice === "number") where.priceCents = { ...(where.priceCents ?? {}), gte: minPrice };
-  if (typeof maxPrice === "number") where.priceCents = { ...(where.priceCents ?? {}), lte: maxPrice };
+  if (typeof minPrice === "number") {
+    where.priceCents = { ...(where.priceCents ?? {}), gte: minPrice };
+  }
+  if (typeof maxPrice === "number") {
+    where.priceCents = { ...(where.priceCents ?? {}), lte: maxPrice };
+  }
 
   if (countryCode) {
-    // Only apply if your schema has `countryCode` on Listing.
-    // Safe to keep — Prisma will ignore undefined fields.
-    where.countryCode = countryCode;
+    // Country lives on SellerProfile, not on Listing
+    where.user = { sellerProfile: { is: { countryCode } } };
   }
 
   const listings = await prisma.listing.findMany({
@@ -71,7 +74,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
 
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-6">
-      {/* Hero search (slug-based categories) */}
+      {/* Search bar */}
       <form
         className="rounded-2xl bg-orange-50 p-4 md:p-5 flex flex-col md:flex-row gap-3 items-stretch md:items-center"
         method="get"
@@ -89,9 +92,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
         >
           <option value="">All categories</option>
           {categories.map((c) => (
-            <option key={c.id} value={c.slug}>
-              {c.name}
-            </option>
+            <option key={c.id} value={c.slug}>{c.name}</option>
           ))}
         </select>
         <input
@@ -108,15 +109,12 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           className="w-32 rounded-xl border px-3 py-3"
           inputMode="numeric"
         />
-        <button
-          type="submit"
-          className="rounded-xl bg-orange-600 text-white font-medium px-6 py-3"
-        >
+        <button type="submit" className="rounded-xl bg-orange-600 text-white font-medium px-6 py-3">
           Search
         </button>
       </form>
 
-      {/* Country filter + map */}
+      {/* Country + map */}
       <FilterBar />
 
       <div className="text-sm text-gray-600">
