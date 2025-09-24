@@ -7,8 +7,10 @@ import EuropeMap from "@/components/EuropeMap";
 import SloganBanner from "@/components/SloganBanner";
 import { useMemo, useState } from "react";
 
+type CategoryOption = { id: string; name: string };
+
 type Props = {
-  categories: string[]; // provided by server (real values from DB)
+  categories: CategoryOption[];
 };
 
 const EU_CODES = Object.entries(COUNTRY_NAMES).map(([cc, name]) => ({
@@ -21,13 +23,13 @@ export default function FilterBar({ categories }: Props) {
   const sp = useSearchParams();
 
   const [q, setQ] = useState(sp.get("q") ?? "");
-  // Only use the current category if it's in the list; otherwise show "Any"
-  const initialCategory = useMemo(() => {
-    const c = (sp.get("category") ?? "").trim();
-    return categories.includes(c) ? c : "";
-  }, [categories, sp]);
-  const [category, setCategory] = useState(initialCategory);
 
+  const validCategoryId = useMemo(() => {
+    const id = (sp.get("category") ?? "").trim();
+    return categories.some((c) => c.id === id) ? id : "";
+  }, [categories, sp]);
+
+  const [categoryId, setCategoryId] = useState<string>(validCategoryId);
   const [min, setMin] = useState(sp.get("min") ?? "");
   const [max, setMax] = useState(sp.get("max") ?? "");
   const [country, setCountry] = useState<CountryCode | "">(
@@ -43,7 +45,7 @@ export default function FilterBar({ categories }: Props) {
     };
 
     set("q", q || null);
-    set("category", category || null);
+    set("category", categoryId || null); // ✅ send Category.id
     set("min", min || null);
     set("max", max || null);
     set("country", country || null);
@@ -68,16 +70,16 @@ export default function FilterBar({ categories }: Props) {
             onChange={(e) => setQ(e.target.value)}
           />
 
-          {/* ✅ Real dropdown, using categories from DB */}
+          {/* ✅ Real categories from DB (Category.id as value) */}
           <select
             className="rounded-xl border px-3 py-2"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
           >
             <option value="">Category (Any)</option>
             {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </select>
