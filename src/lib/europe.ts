@@ -88,7 +88,6 @@ export const COUNTRY_CENTROIDS: Record<CountryCode, [number, number]> = {
   SK: [48.67, 19.70],
 };
 
-// (optional) helpers if you ever re-enable the distance UI
 export function toRad(n: number) {
   return (n * Math.PI) / 180;
 }
