@@ -16,7 +16,7 @@ function parsePriceToCents(v?: string) {
   const n = Number((v ?? "").trim().replace(",", "."));
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : undefined;
 }
-
+export const dynamic = "force-dynamic";
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
   const q = (searchParams?.q ?? "").trim();
   const categorySlug = (searchParams?.category ?? "").trim();
