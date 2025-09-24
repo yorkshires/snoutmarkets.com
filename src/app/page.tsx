@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export default async function Home() {
   noStore(); // absolutely no caching
 
-  // ✅ Always show latest listings — no filters at all
+  // Always show latest listings — no filters at all
   const listings = await prisma.listing.findMany({
     orderBy: { createdAt: "desc" },
     take: 30,
@@ -37,11 +37,11 @@ export default async function Home() {
           gear—no platform payments, contact sellers directly.
         </p>
 
-        {/* Pretty search bar (UI only; filters intentionally disabled for reliability) */}
+        {/* Pretty search bar (UI only; no client handlers in server component) */}
         <form
           className="mt-6 rounded-2xl bg-white/70 backdrop-blur border p-4 md:p-5 flex flex-col md:flex-row gap-3 items-stretch md:items-center shadow-sm"
           method="get"
-          onSubmit={(e) => e.preventDefault()}
+          action="/"
         >
           <input
             name="q"
