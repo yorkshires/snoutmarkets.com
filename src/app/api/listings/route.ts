@@ -2,8 +2,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionUserId } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 
-// Convert "19.95" / "19,95" to integer cents (e.g. 1995). Returns null if invalid.
+// "19.95" or "19,95" -> 1995
 function toCents(v: FormDataEntryValue | null): number | null {
   if (v === null) return null;
   const s = String(v).trim().replace(",", ".");
@@ -13,27 +14,30 @@ function toCents(v: FormDataEntryValue | null): number | null {
 
 export async function POST(req: Request) {
   const origin = new URL(req.url).origin;
-
   const userId = await getSessionUserId();
   if (!userId) {
-    return NextResponse.redirect(`${origin}/login?next=/sell/new`, { status: 302 });
+    return NextResponse.redirect(`${origin}/login?next=/sell/new`);
   }
 
   const form = await req.formData();
+
   const title = String(form.get("title") ?? "").trim();
   const description = String(form.get("description") ?? "").trim();
   const categorySlug = String(form.get("category") ?? "").trim();
   const priceCents = toCents(form.get("price"));
-  const location = String(form.get("location") ?? "").trim();
-  const imageUrl = String(form.get("imageUrl") ?? "").trim();
+  const location = String(form.get("location") ?? "").trim() || null;
+  const imageUrl = String(form.get("imageUrl") ?? "").trim() || null;
 
-  if (!title || !description || !categorySlug || priceCents === null) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  if (!title || !categorySlug || priceCents == null) {
+    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const category = await prisma.category.findFirst({ where: { slug: categorySlug } });
+  const category = await prisma.category.findUnique({
+    where: { slug: categorySlug },
+    select: { id: true },
+  });
   if (!category) {
-    return NextResponse.json({ error: "Unknown category" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid category" }, { status: 400 });
   }
 
   const listing = await prisma.listing.create({
@@ -46,9 +50,14 @@ export async function POST(req: Request) {
       location,
       imageUrl,
       user: { connect: { id: userId } },
+      // status defaults to ACTIVE in schema; no need to set explicitly
     },
     select: { id: true },
   });
+
+  // ⬅️ make sure lists update everywhere
+  revalidatePath("/");                   // homepage
+  revalidatePath("/account/listings");   // "My listings"
 
   return NextResponse.redirect(`${origin}/listings/${listing.id}`);
 }
