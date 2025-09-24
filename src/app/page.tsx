@@ -2,7 +2,7 @@
 import { prisma } from "@/lib/db";
 import ListingCard from "@/components/ListingCard";
 import FilterBar from "@/components/FilterBar";
-import type { CountryCode } from "@/lib/europe";
+import { COUNTRY_NAMES, type CountryCode } from "@/lib/europe";
 import { unstable_noStore as noStore } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ type SearchParams = {
   category?: string; // category slug
   min?: string;      // "19.99" or "19,99"
   max?: string;
-  country?: string;  // seller country (2-letter)
+  country?: string;  // 2-letter seller country code
 };
 
 function toCents(v?: string) {
@@ -21,22 +21,29 @@ function toCents(v?: string) {
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : undefined;
 }
 
+const VALID_COUNTRIES = new Set(Object.keys(COUNTRY_NAMES) as CountryCode[]);
+
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
-  noStore(); // always fetch fresh data
+  noStore(); // absolutely no caching
 
   const q            = (searchParams?.q ?? "").trim();
   const categorySlug = (searchParams?.category ?? "").trim();
   const minPrice     = toCents(searchParams?.min);
   const maxPrice     = toCents(searchParams?.max);
-  const countryCode  = (searchParams?.country ?? "").toUpperCase() as CountryCode | "";
 
-  // for the category dropdown
+  // Only treat it as a filter if it's an actually valid 2-letter code we know.
+  const rawCountry   = (searchParams?.country ?? "").toUpperCase();
+  const countryCode  = VALID_COUNTRIES.has(rawCountry as CountryCode)
+    ? (rawCountry as CountryCode)
+    : undefined;
+
+  // Populate category dropdown
   const categories = await prisma.category.findMany({
     orderBy: { name: "asc" },
     select: { id: true, slug: true, name: true },
   });
 
-  // ---- build filters (keep only ACTIVE on homepage) ----
+  // ---- Build WHERE (keep ACTIVE on homepage) ----
   const where: any = { status: "ACTIVE" as const };
 
   if (q) {
@@ -47,8 +54,8 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
   }
 
   if (categorySlug) {
-    // to-one relation filter by slug
-    where.category = { is: { slug: categorySlug } };
+    // For required many-to-one use direct nested filter (no `is`)
+    where.category = { slug: categorySlug };
   }
 
   if (typeof minPrice === "number" || typeof maxPrice === "number") {
@@ -58,9 +65,12 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
   }
 
   if (countryCode) {
-    // your earlier code used user.profile; keep that shape
-    // (if your Prisma model uses sellerProfile instead, change "profile" to "sellerProfile")
-   where.user = { is: { sellerProfile: { is: { countryCode } } } };
+    // Apply ONLY if valid; skip otherwise so we never hide everything.
+    // Use whichever relation you actually have. If your model is user.profile, keep `profile`;
+    // if it's user.sellerProfile, change it below to `sellerProfile`.
+    where.user = { profile: { countryCode } };
+    // If your schema uses `sellerProfile` instead of `profile`, use:
+    // where.user = { sellerProfile: { countryCode } };
   }
 
   const listings = await prisma.listing.findMany({
@@ -79,7 +89,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
 
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-6">
-      {/* Hero search */}
+      {/* Search bar */}
       <form
         className="rounded-2xl bg-orange-50 p-4 md:p-5 flex flex-col md:flex-row gap-3 items-stretch md:items-center"
         method="get"
