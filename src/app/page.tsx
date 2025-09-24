@@ -7,14 +7,17 @@ import type { CountryCode } from "@/lib/europe";
 type SearchParams = {
   q?: string;
   category?: string;
-  min?: string;
-  max?: string;
-  country?: string; // two-letter code: DK, DE, etc.
+  min?: string; // EUR as string, e.g. "10" or "10.50"
+  max?: string; // EUR as string
+  country?: string; // two-letter code, e.g. "DK"
 };
 
-function parsePrice(v?: string) {
-  const n = Number(v);
+function toNumber(v?: string) {
+  const n = Number((v ?? "").trim().replace(",", "."));
   return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+function eurToCents(n?: number) {
+  return n === undefined ? undefined : Math.round(n * 100);
 }
 
 export default async function Home({
@@ -24,13 +27,14 @@ export default async function Home({
 }) {
   const q = (searchParams.q ?? "").trim();
   const category = (searchParams.category ?? "").trim();
-  const min = parsePrice(searchParams.min);
-  const max = parsePrice(searchParams.max);
+  const minEUR = toNumber(searchParams.min);
+  const maxEUR = toNumber(searchParams.max);
+  const minCents = eurToCents(minEUR);
+  const maxCents = eurToCents(maxEUR);
   const country = (searchParams.country ?? "").trim().toUpperCase() as
     | CountryCode
     | "";
 
-  // Build a safe Prisma "where" without touching unknown relation paths.
   const where: any = { status: "ACTIVE" };
 
   if (q) {
@@ -42,13 +46,14 @@ export default async function Home({
 
   if (category) where.category = category;
 
-  if (min !== undefined || max !== undefined) {
-    where.price = {};
-    if (min !== undefined) where.price.gte = min;
-    if (max !== undefined) where.price.lte = max;
+  // ✅ Use priceCents (NOT price), and convert EUR ➜ cents
+  if (minCents !== undefined || maxCents !== undefined) {
+    where.priceCents = {};
+    if (minCents !== undefined) where.priceCents.gte = minCents;
+    if (maxCents !== undefined) where.priceCents.lte = maxCents;
   }
 
-  // Fetch first, including the seller's profile.countryCode.
+  // Fetch listings; include seller profile countryCode for client display
   const listings = await prisma.listing.findMany({
     where,
     orderBy: { createdAt: "desc" },
@@ -62,7 +67,7 @@ export default async function Home({
     take: 60,
   });
 
-  // Filter by country in memory to avoid schema-specific Prisma paths.
+  // Optional country filter (robust across schema variations)
   const filtered =
     country
       ? listings.filter(
