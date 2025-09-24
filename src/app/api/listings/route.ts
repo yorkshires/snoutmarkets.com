@@ -15,9 +15,7 @@ function toCents(v: FormDataEntryValue | null): number | null {
 export async function POST(req: Request) {
   const origin = new URL(req.url).origin;
   const userId = await getSessionUserId();
-  if (!userId) {
-    return NextResponse.redirect(`${origin}/login?next=/sell/new`);
-  }
+  if (!userId) return NextResponse.redirect(`${origin}/login?next=/sell/new`);
 
   const form = await req.formData();
 
@@ -50,14 +48,14 @@ export async function POST(req: Request) {
       location,
       imageUrl,
       user: { connect: { id: userId } },
-      // status defaults to ACTIVE in schema; no need to set explicitly
+      status: "ACTIVE",            // ✅ ensure visible
+      // publishedAt: new Date(),   // uncomment if your model has this column
     },
     select: { id: true },
   });
 
-  // ⬅️ make sure lists update everywhere
-  revalidatePath("/");                   // homepage
-  revalidatePath("/account/listings");   // "My listings"
+  revalidatePath("/");                   // refresh homepage
+  revalidatePath("/account/listings");
 
   return NextResponse.redirect(`${origin}/listings/${listing.id}`);
 }
