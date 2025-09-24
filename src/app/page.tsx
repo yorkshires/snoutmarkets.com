@@ -3,26 +3,32 @@ import { prisma } from "@/lib/db";
 import ListingCard from "@/components/ListingCard";
 import FilterBar from "@/components/FilterBar";
 import type { CountryCode } from "@/lib/europe";
+import { unstable_noStore as noStore } from "next/cache"; // ⬅️ add this
+
+export const dynamic = "force-dynamic"; // ⬅️ keep this (or use revalidate=0)
 
 type SearchParams = {
   q?: string;
-  category?: string; // category slug
-  min?: string;      // EUR string
-  max?: string;      // EUR string
-  country?: string;  // two-letter code (uses seller profile countryCode)
+  category?: string;
+  min?: string;
+  max?: string;
+  country?: string;
 };
 
 function parsePriceToCents(v?: string) {
   const n = Number((v ?? "").trim().replace(",", "."));
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : undefined;
 }
-export const dynamic = "force-dynamic";
+
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
+  noStore(); // ⬅️ hard-disable caching for this render
+
   const q = (searchParams?.q ?? "").trim();
   const categorySlug = (searchParams?.category ?? "").trim();
   const minPrice = parsePriceToCents(searchParams?.min);
   const maxPrice = parsePriceToCents(searchParams?.max);
   const countryCode = (searchParams?.country ?? "").toUpperCase() as CountryCode | "";
+}
 
   // Load categories for the hero select (slug-based)
   const categories = await prisma.category.findMany({
