@@ -36,7 +36,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
   });
 
   // ---- Build WHERE safely ----
-  const where: any = { status: "ACTIVE" as const };
+const where: any = {}; // no status filter
 
   if (q) {
     where.OR = [
