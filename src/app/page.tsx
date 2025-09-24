@@ -60,7 +60,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
   if (countryCode) {
     // your earlier code used user.profile; keep that shape
     // (if your Prisma model uses sellerProfile instead, change "profile" to "sellerProfile")
-    where.user = { is: { profile: { is: { countryCode } } } };
+   where.user = { is: { sellerProfile: { is: { countryCode } } } };
   }
 
   const listings = await prisma.listing.findMany({
