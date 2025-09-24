@@ -7,17 +7,27 @@ import EuropeMap from "@/components/EuropeMap";
 import SloganBanner from "@/components/SloganBanner";
 import { useMemo, useState } from "react";
 
+type Props = {
+  categories: string[]; // provided by server (real values from DB)
+};
+
 const EU_CODES = Object.entries(COUNTRY_NAMES).map(([cc, name]) => ({
   code: cc as CountryCode,
   name,
 }));
 
-export default function FilterBar() {
+export default function FilterBar({ categories }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
 
   const [q, setQ] = useState(sp.get("q") ?? "");
-  const [category, setCategory] = useState(sp.get("category") ?? "");
+  // Only use the current category if it's in the list; otherwise show "Any"
+  const initialCategory = useMemo(() => {
+    const c = (sp.get("category") ?? "").trim();
+    return categories.includes(c) ? c : "";
+  }, [categories, sp]);
+  const [category, setCategory] = useState(initialCategory);
+
   const [min, setMin] = useState(sp.get("min") ?? "");
   const [max, setMax] = useState(sp.get("max") ?? "");
   const [country, setCountry] = useState<CountryCode | "">(
@@ -26,6 +36,7 @@ export default function FilterBar() {
 
   const submit = (patch?: Partial<Record<string, string | null>>) => {
     const next = new URLSearchParams(sp.toString());
+
     const set = (k: string, v: string | null | undefined) => {
       if (!v) next.delete(k);
       else next.set(k, v);
@@ -49,7 +60,7 @@ export default function FilterBar() {
       <SloganBanner />
 
       <div className="rounded-2xl border bg-white p-4">
-        <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-5">
           <input
             className="rounded-xl border px-3 py-2"
             placeholder="Search dogs or gear…"
@@ -57,32 +68,38 @@ export default function FilterBar() {
             onChange={(e) => setQ(e.target.value)}
           />
 
-          <input
+          {/* ✅ Real dropdown, using categories from DB */}
+          <select
             className="rounded-xl border px-3 py-2"
-            placeholder="Category (optional)"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
+          >
+            <option value="">Category (Any)</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+
+          <input
+            className="rounded-xl border px-3 py-2"
+            placeholder="Min price"
+            inputMode="numeric"
+            value={min}
+            onChange={(e) => setMin(e.target.value)}
           />
 
-          <div className="flex gap-2">
-            <input
-              className="w-1/2 rounded-xl border px-3 py-2"
-              placeholder="Min price"
-              inputMode="numeric"
-              value={min}
-              onChange={(e) => setMin(e.target.value)}
-            />
-            <input
-              className="w-1/2 rounded-xl border px-3 py-2"
-              placeholder="Max price"
-              inputMode="numeric"
-              value={max}
-              onChange={(e) => setMax(e.target.value)}
-            />
-          </div>
+          <input
+            className="rounded-xl border px-3 py-2"
+            placeholder="Max price"
+            inputMode="numeric"
+            value={max}
+            onChange={(e) => setMax(e.target.value)}
+          />
 
           <div className="flex gap-2 items-center">
-            <label className="text-sm text-slate-600">Filter by country</label>
+            <label className="text-sm text-slate-600">Filter by</label>
             <select
               value={country ?? ""}
               onChange={(e) =>
