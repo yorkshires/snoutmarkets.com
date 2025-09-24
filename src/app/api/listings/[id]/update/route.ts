@@ -4,12 +4,6 @@ import { prisma } from "@/lib/db";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
-// ...after prisma.listing.update(...)
-revalidatePath("/");
-revalidatePath("/account/listings");
-revalidatePath(`/listings/${ctx.params.id}`);
-
-
 function toCents(v: FormDataEntryValue | null): number | null {
   if (v === null) return null;
   const s = String(v).trim().replace(",", ".");
@@ -58,6 +52,10 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   }
 
   await prisma.listing.update({
+    // ...after prisma.listing.update(...)
+revalidatePath("/");
+revalidatePath("/account/listings");
+revalidatePath(`/listings/${ctx.params.id}`);
     where: { id: ctx.params.id },
     data: {
       title,
