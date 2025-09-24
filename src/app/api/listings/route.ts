@@ -48,13 +48,16 @@ export async function POST(req: Request) {
       location,
       imageUrl,
       user: { connect: { id: userId } },
-      status: "ACTIVE",            // ✅ ensure visible
-      // publishedAt: new Date(),   // uncomment if your model has this column
+
+      // ✅ ensure new items appear on homepage
+      status: "ACTIVE",
+      // publishedAt: new Date(), // uncomment if your schema has this column
     },
     select: { id: true },
   });
 
-  revalidatePath("/");                   // refresh homepage
+  // refresh pages that show listings
+  revalidatePath("/");
   revalidatePath("/account/listings");
 
   return NextResponse.redirect(`${origin}/listings/${listing.id}`);
