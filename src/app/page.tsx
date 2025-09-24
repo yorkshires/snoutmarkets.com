@@ -21,7 +21,7 @@ function parsePriceToCents(v?: string) {
 }
 
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
-  noStore(); // hard-disable any caching for this render
+  noStore(); // disable caching for this render
 
   const q = (searchParams?.q ?? "").trim();
   const categorySlug = (searchParams?.category ?? "").trim();
@@ -35,8 +35,8 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
     orderBy: { name: "asc" },
   });
 
-  // ---- Build WHERE safely ----
-const where: any = {}; // no status filter
+  // Build WHERE with NO status gate (so you see what's there)
+  const where: any = {};
 
   if (q) {
     where.OR = [
@@ -46,19 +46,15 @@ const where: any = {}; // no status filter
   }
 
   if (categorySlug) {
-    // Correct way to filter by an optional to-one relation
+    // correct relation filter
     where.category = { is: { slug: categorySlug } };
   }
 
-  if (typeof minPrice === "number") {
-    where.priceCents = { ...(where.priceCents ?? {}), gte: minPrice };
-  }
-  if (typeof maxPrice === "number") {
-    where.priceCents = { ...(where.priceCents ?? {}), lte: maxPrice };
-  }
+  if (typeof minPrice === "number") where.priceCents = { ...(where.priceCents ?? {}), gte: minPrice };
+  if (typeof maxPrice === "number") where.priceCents = { ...(where.priceCents ?? {}), lte: maxPrice };
 
   if (countryCode) {
-    // Country lives on SellerProfile, not on Listing
+    // seller country lives on SellerProfile (user -> sellerProfile)
     where.user = { sellerProfile: { is: { countryCode } } };
   }
 
@@ -74,7 +70,7 @@ const where: any = {}; // no status filter
 
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-6">
-      {/* Search bar */}
+      {/* Search */}
       <form
         className="rounded-2xl bg-orange-50 p-4 md:p-5 flex flex-col md:flex-row gap-3 items-stretch md:items-center"
         method="get"
@@ -92,7 +88,9 @@ const where: any = {}; // no status filter
         >
           <option value="">All categories</option>
           {categories.map((c) => (
-            <option key={c.id} value={c.slug}>{c.name}</option>
+            <option key={c.id} value={c.slug}>
+              {c.name}
+            </option>
           ))}
         </select>
         <input
@@ -114,7 +112,7 @@ const where: any = {}; // no status filter
         </button>
       </form>
 
-      {/* Country + map */}
+      {/* Country filter + map */}
       <FilterBar />
 
       <div className="text-sm text-gray-600">
