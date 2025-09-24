@@ -6,10 +6,10 @@ import type { CountryCode } from "@/lib/europe";
 
 type SearchParams = {
   q?: string;
-  category?: string; // slug/string stored in DB
+  category?: string; // Category.id
   min?: string;      // EUR string
   max?: string;      // EUR string
-  country?: string;  // two-letter, e.g. "DK"
+  country?: string;  // two-letter code, e.g. "DK"
 };
 
 function toNumber(v?: string) {
@@ -22,24 +22,19 @@ function eurToCents(n?: number) {
 
 export default async function Home({ searchParams }: { searchParams: SearchParams }) {
   const q = (searchParams.q ?? "").trim();
-  const rawCategory = (searchParams.category ?? "").trim();
   const minCents = eurToCents(toNumber(searchParams.min));
   const maxCents = eurToCents(toNumber(searchParams.max));
   const country = (searchParams.country ?? "").trim().toUpperCase() as CountryCode | "";
 
-  // Get the distinct categories that actually exist in the DB (ACTIVE only).
-  const distinctCats = await prisma.listing.findMany({
-    where: { status: "ACTIVE" },
-    distinct: ["category"],
-    select: { category: true },
-    orderBy: { category: "asc" },
+  // ✅ Load real categories from DB
+  const categories = await prisma.category.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
   });
-  const categories: string[] = distinctCats
-    .map((c) => c.category)
-    .filter((x): x is string => !!x);
 
   // Only accept the category if it exists; otherwise ignore it.
-  const category = categories.includes(rawCategory) ? rawCategory : "";
+  const rawCategoryId = (searchParams.category ?? "").trim();
+  const categoryId = categories.some((c) => c.id === rawCategoryId) ? rawCategoryId : "";
 
   const where: any = { status: "ACTIVE" };
 
@@ -50,7 +45,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     ];
   }
 
-  if (category) where.category = category;
+  if (categoryId) where.categoryId = categoryId;
 
   if (minCents !== undefined || maxCents !== undefined) {
     where.priceCents = {};
@@ -63,6 +58,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     orderBy: { createdAt: "desc" },
     include: {
       user: { select: { profile: { select: { countryCode: true } } } },
+      category: { select: { id: true, name: true } },
     },
     take: 60,
   });
@@ -74,7 +70,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 space-y-8">
-      {/* Pass the real categories down to the client filter bar */}
+      {/* Pass categories to the client filter bar */}
       <FilterBar categories={categories} />
 
       <h2 className="text-2xl font-semibold">Latest listings</h2>
