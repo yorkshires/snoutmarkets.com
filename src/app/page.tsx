@@ -68,7 +68,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
     // Apply ONLY if valid; skip otherwise so we never hide everything.
     // Use whichever relation you actually have. If your model is user.profile, keep `profile`;
     // if it's user.sellerProfile, change it below to `sellerProfile`.
-    where.user = { profile: { countryCode } };
+where.user = { is: { sellerProfile: { is: { countryCode } } } };
     // If your schema uses `sellerProfile` instead of `profile`, use:
     // where.user = { sellerProfile: { countryCode } };
   }
