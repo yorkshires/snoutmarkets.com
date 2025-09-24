@@ -40,22 +40,24 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     return NextResponse.redirect(`${origin}/sell/edit/${ctx.params.id}?error=invalid`);
   }
 
-  const category = await prisma.category.findUnique({ where: { slug: categorySlug }, select: { id: true } });
+  const category = await prisma.category.findUnique({
+    where: { slug: categorySlug },
+    select: { id: true },
+  });
   if (!category) {
     return NextResponse.redirect(`${origin}/sell/edit/${ctx.params.id}?error=bad_category`);
   }
 
   // ensure ownership
-  const owned = await prisma.listing.findFirst({ where: { id: ctx.params.id, userId }, select: { id: true } });
+  const owned = await prisma.listing.findFirst({
+    where: { id: ctx.params.id, userId },
+    select: { id: true },
+  });
   if (!owned) {
     return NextResponse.redirect(`${origin}/account/listings?error=not_owner`);
   }
 
   await prisma.listing.update({
-    // ...after prisma.listing.update(...)
-revalidatePath("/");
-revalidatePath("/account/listings");
-revalidatePath(`/listings/${ctx.params.id}`);
     where: { id: ctx.params.id },
     data: {
       title,
@@ -67,6 +69,11 @@ revalidatePath(`/listings/${ctx.params.id}`);
       imageUrl,
     },
   });
+
+  // 🔄 revalidate AFTER a successful update
+  revalidatePath("/");
+  revalidatePath("/account/listings");
+  revalidatePath(`/listings/${ctx.params.id}`);
 
   return NextResponse.redirect(`${origin}/listings/${ctx.params.id}`);
 }
