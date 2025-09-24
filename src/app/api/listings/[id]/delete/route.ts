@@ -32,7 +32,10 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   }
 
   await prisma.listing.delete({ where: { id: ctx.params.id } });
+
+  // refresh pages that show listings
   revalidatePath("/");
-revalidatePath("/account/listings");
+  revalidatePath("/account/listings");
+
   return NextResponse.redirect(`${origin}/account/listings?deleted=1`);
 }
