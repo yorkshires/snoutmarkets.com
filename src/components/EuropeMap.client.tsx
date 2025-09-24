@@ -14,38 +14,39 @@ type Props = {
 
 export default function EuropeMapClient({ selected, onSelect }: Props) {
   const points = useMemo(() => {
-    return (Object.keys(COUNTRY_CENTROIDS) as CountryCode[]).map((cc) => ({
+    return Object.entries(COUNTRY_CENTROIDS).map(([cc, [lat, lng]]) => ({
       cc,
-      lat: COUNTRY_CENTROIDS[cc][0],
-      lng: COUNTRY_CENTROIDS[cc][1],
+      lat,
+      lng,
     }));
   }, []);
 
   return (
-    <div className="h-[380px] rounded-xl overflow-hidden border">
+    <div className="h-[380px] rounded-xl overflow-hidden border bg-white">
       <MapContainer
-        center={[54, 15]}
+        center={[54.5, 10]}
         zoom={4}
         scrollWheelZoom={false}
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
-          attribution="&copy; OpenStreetMap contributors"
+          attribution='&copy; OpenStreetMap contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         {points.map((p) => {
-          const active = selected === p.cc;
+          const isSelected = selected && p.cc === selected;
           return (
             <CircleMarker
               key={p.cc}
               center={[p.lat, p.lng]}
-              radius={active ? 8 : 6}
+              radius={isSelected ? 9 : 7}
               pathOptions={{
-                color: active ? "#EA580C" : "#1f2937",
-                weight: 2,
+                weight: isSelected ? 2 : 1,
+                color: isSelected ? "#FB923C" : "#0F172A",
+                fillColor: isSelected ? "#FB923C" : "#0F172A",
                 fillOpacity: 0.9,
               }}
-              eventHandlers={{ click: () => onSelect?.(p.cc) }}
+              eventHandlers={{ click: () => onSelect?.(p.cc as CountryCode) }}
             >
               <Tooltip direction="right" offset={[8, 0]} opacity={1} permanent>
                 <span className="font-medium text-[12px]">{p.cc}</span>
