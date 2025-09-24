@@ -5,38 +5,38 @@ import FilterBar from "@/components/FilterBar";
 import type { CountryCode } from "@/lib/europe";
 import { unstable_noStore as noStore } from "next/cache";
 
-export const dynamic = "force-dynamic"; // always fetch fresh
+export const dynamic = "force-dynamic"; // ⬅️ prevent caching of the homepage
 
 type SearchParams = {
   q?: string;
-  category?: string; // category slug
-  min?: string;      // price string ("19.99" or "19,99")
-  max?: string;      // price string
-  country?: string;  // 2-letter seller country code
+  category?: string;
+  min?: string;
+  max?: string;
+  country?: string; // optional country filter (uses seller profile country code)
 };
 
-function parsePriceToCents(v?: string) {
+function parsePrice(v?: string) {
+  // also accept comma decimals like "19,99"
   const n = Number((v ?? "").trim().replace(",", "."));
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : undefined;
 }
 
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
-  noStore(); // disable caching for this render
+  noStore(); // ⬅️ hard-disable any per-request caching
 
   const q = (searchParams?.q ?? "").trim();
   const categorySlug = (searchParams?.category ?? "").trim();
-  const minPrice = parsePriceToCents(searchParams?.min);
-  const maxPrice = parsePriceToCents(searchParams?.max);
+  const minPrice = parsePrice(searchParams?.min);
+  const maxPrice = parsePrice(searchParams?.max);
   const countryCode = (searchParams?.country ?? "").toUpperCase() as CountryCode | "";
 
-  // For the category dropdown
   const categories = await prisma.category.findMany({
-    select: { id: true, name: true, slug: true },
     orderBy: { name: "asc" },
+    select: { id: true, slug: true, name: true },
   });
 
-  // Build WHERE with NO status gate (so you see what's there)
-  const where: any = {};
+  // keep your original intent: show only ACTIVE
+  const where: any = { status: "ACTIVE" as const };
 
   if (q) {
     where.OR = [
@@ -46,31 +46,44 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
   }
 
   if (categorySlug) {
-    // correct relation filter
+    // correct relation filter by slug
     where.category = { is: { slug: categorySlug } };
   }
 
-  if (typeof minPrice === "number") where.priceCents = { ...(where.priceCents ?? {}), gte: minPrice };
-  if (typeof maxPrice === "number") where.priceCents = { ...(where.priceCents ?? {}), lte: maxPrice };
+  if (minPrice != null || maxPrice != null) {
+    where.priceCents = {};
+    if (minPrice != null) where.priceCents.gte = minPrice;
+    if (maxPrice != null) where.priceCents.lte = maxPrice;
+  }
 
+  // Country filter via seller profile (user.profile.countryCode)
   if (countryCode) {
-    // seller country lives on SellerProfile (user -> sellerProfile)
-    where.user = { sellerProfile: { is: { countryCode } } };
+    where.user = {
+      is: {
+        profile: {
+          is: { countryCode },
+        },
+      },
+    };
   }
 
   const listings = await prisma.listing.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    take: 12,
-    include: {
-      category: { select: { name: true, slug: true } },
-      user: { select: { id: true, name: true } },
+    take: 30,
+    select: {
+      id: true,
+      title: true,
+      imageUrl: true,
+      priceCents: true,
+      currency: true,
+      location: true,
     },
   });
 
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-6">
-      {/* Search */}
+      {/* Existing hero search */}
       <form
         className="rounded-2xl bg-orange-50 p-4 md:p-5 flex flex-col md:flex-row gap-3 items-stretch md:items-center"
         method="get"
@@ -81,11 +94,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           placeholder="Search dogs or gear..."
           className="flex-1 rounded-xl border px-4 py-3 outline-none"
         />
-        <select
-          name="category"
-          defaultValue={categorySlug || ""}
-          className="rounded-xl border px-3 py-3"
-        >
+        <select name="category" defaultValue={categorySlug || ""} className="rounded-xl border px-3 py-3">
           <option value="">All categories</option>
           {categories.map((c) => (
             <option key={c.id} value={c.slug}>
@@ -112,7 +121,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
         </button>
       </form>
 
-      {/* Country filter + map */}
+      {/* Country filter + small Europe map */}
       <FilterBar />
 
       <div className="text-sm text-gray-600">
