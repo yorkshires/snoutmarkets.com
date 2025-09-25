@@ -101,11 +101,6 @@ export default function LoginPage() {
             That verification link expired. Enter your email below and click “Resend verification”.
           </div>
         )}
-        {magicSent && (
-          <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-green-800">
-            Magic link sent! Check your inbox.
-          </div>
-        )}
       </div>
       {/* Tabs */}
       <div className="flex gap-3 mb-6">
@@ -114,12 +109,6 @@ export default function LoginPage() {
           onClick={() => setTab("password")}
         >
           Email & password
-        </button>
-        <button
-          className={`px-4 py-2 rounded-2xl ${tab === "magic" ? "bg-orange-600 text-white" : "bg-white"}`}
-          onClick={() => setTab("magic")}
-        >
-          Magic link
         </button>
       </div>
 
@@ -166,24 +155,6 @@ export default function LoginPage() {
           </form>
         )}
 
-        {tab === "magic" && (
-          <form method="POST" action="/api/auth/magic-link" className="space-y-5">
-            <div>
-              <label className="block mb-2">Email</label>
-              <input
-                name="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-2xl border px-4 py-3"
-              />
-            </div>
-            <button type="submit" className="w-full rounded-2xl bg-orange-600 text-white px-4 py-3">
-              Send magic link
-            </button>
-          </form>
-        )}
       </div>
     </div>
   );
