@@ -1,5 +1,6 @@
 // src/app/sell/new/page.tsx
 import { prisma } from "@/lib/db";
+import BindImageUploader from "@/components/BindImageUploader";
 
 export const dynamic = "force-dynamic";
 
@@ -79,13 +80,19 @@ export default async function NewListingPage() {
           </div>
         </div>
 
+        {/* Image upload */}
         <div>
-          <label className="block text-sm font-medium mb-1">Image URL (optional)</label>
-          <input
-            name="imageUrl"
-            className="w-full rounded-lg border px-3 py-2 outline-none"
-            placeholder="https://…"
-          />
+          <label className="block text-sm font-medium mb-1">Images</label>
+
+          {/* Hidden field that your API expects */}
+          <input type="hidden" name="imageUrl" id="imageUrl" defaultValue="" />
+
+          {/* Client uploader that writes the uploaded URL into the hidden input */}
+          <BindImageUploader inputId="imageUrl" initialUrl={null} />
+
+          <p className="text-xs text-gray-500 mt-2">
+            Drag & drop or click to choose a file. The uploaded image URL will be saved with this listing.
+          </p>
         </div>
 
         <div className="pt-2">
