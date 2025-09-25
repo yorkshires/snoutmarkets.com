@@ -107,7 +107,6 @@ export default function LoginPage() {
           </div>
         )}
       </div>
-
       {/* Tabs */}
       <div className="flex gap-3 mb-6">
         <button
@@ -117,7 +116,11 @@ export default function LoginPage() {
           Email & password
         </button>
         <button
+          className={`px-4 py-2 rounded-2xl ${tab === "magic" ? "bg-orange-600 text-white" : "bg-white"}`}
+          onClick={() => setTab("magic")}
         >
+          Magic link
+        </button>
       </div>
 
       <div className="bg-white rounded-3xl p-8 shadow-sm border">
