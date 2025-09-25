@@ -1,8 +1,8 @@
 // src/app/api/listings/[id]/update/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { getSessionUserId } from "@/lib/auth";
 
 function toCents(v: FormDataEntryValue | null): number | null {
   if (v === null) return null;
@@ -11,22 +11,12 @@ function toCents(v: FormDataEntryValue | null): number | null {
   return Number.isFinite(n) ? Math.round(n * 100) : null;
 }
 
-async function ensureUserId(): Promise<string> {
-  const c = cookies();
-  const fromCookie = c.get("sm_uid")?.value || c.get("uid")?.value || null;
-  if (fromCookie) return fromCookie;
-  const user = await prisma.user.upsert({
-    where: { email: "demo@snoutmarkets.com" },
-    update: {},
-    create: { email: "demo@snoutmarkets.com", name: "Demo Seller" },
-    select: { id: true },
-  });
-  return user.id;
-}
-
 export async function POST(req: Request, ctx: { params: { id: string } }) {
   const origin = new URL(req.url).origin;
-  const userId = await ensureUserId();
+  const userId = await getSessionUserId();
+  if (!userId) {
+    return NextResponse.redirect(`${origin}/login?next=/sell/edit/${ctx.params.id}`);
+  }
 
   const form = await req.formData();
   const title = String(form.get("title") ?? "").trim();
@@ -36,7 +26,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   const location = String(form.get("location") ?? "").trim();
   const imageUrl = String(form.get("imageUrl") ?? "").trim() || null;
 
-  if (!title || !categorySlug || priceCents === null) {
+  if (!title || !priceCents || !categorySlug) {
     return NextResponse.redirect(`${origin}/sell/edit/${ctx.params.id}?error=invalid`);
   }
 
@@ -48,13 +38,13 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     return NextResponse.redirect(`${origin}/sell/edit/${ctx.params.id}?error=bad_category`);
   }
 
-  // ensure ownership
+  // Only allow editing own listing
   const owned = await prisma.listing.findFirst({
     where: { id: ctx.params.id, userId },
     select: { id: true },
   });
   if (!owned) {
-    return NextResponse.redirect(`${origin}/account/listings?error=not_owner`);
+    return NextResponse.redirect(`${origin}/account/listings?error=not_found_or_not_owner`);
   }
 
   await prisma.listing.update({
@@ -70,7 +60,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     },
   });
 
-  // 🔄 revalidate AFTER a successful update
+  // Revalidate after a successful update
   revalidatePath("/");
   revalidatePath("/account/listings");
   revalidatePath(`/listings/${ctx.params.id}`);
