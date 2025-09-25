@@ -1,25 +1,15 @@
 // src/app/api/listings/[id]/delete/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-
-async function ensureUserId(): Promise<string> {
-  const c = cookies();
-  const fromCookie = c.get("sm_uid")?.value || c.get("uid")?.value || null;
-  if (fromCookie) return fromCookie;
-  const user = await prisma.user.upsert({
-    where: { email: "demo@snoutmarkets.com" },
-    update: {},
-    create: { email: "demo@snoutmarkets.com", name: "Demo Seller" },
-    select: { id: true },
-  });
-  return user.id;
-}
+import { getSessionUserId } from "@/lib/auth";
 
 export async function POST(req: Request, ctx: { params: { id: string } }) {
   const origin = new URL(req.url).origin;
-  const userId = await ensureUserId();
+  const userId = await getSessionUserId();
+  if (!userId) {
+    return NextResponse.redirect(`${origin}/login?next=/account/listings`);
+  }
 
   // Only allow deleting own listing
   const listing = await prisma.listing.findFirst({
@@ -33,7 +23,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
 
   await prisma.listing.delete({ where: { id: ctx.params.id } });
 
-  // refresh pages that show listings
+  // Refresh pages that show listings
   revalidatePath("/");
   revalidatePath("/account/listings");
 
